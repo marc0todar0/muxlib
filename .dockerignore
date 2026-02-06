@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# Environment
+.env.example
+
+# Downloaded files
+*.mp3
+*.webm
+*.webp
+*.png
+*.jpg
+
+# OS
+.DS_Store
+Thumbs.db

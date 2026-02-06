@@ -1,0 +1,12 @@
+services:
+  yt-dlp-bot:
+    build: .
+    container_name: yt-dlp-telegram-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ${FOLDER:-./downloads}:/app/downloads
+    environment:
+      - PYTHONUNBUFFERED=1
+      - FOLDER=/app/downloads
