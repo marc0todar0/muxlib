@@ -1,2 +1,4 @@
 # Bot - yt-dlp downloader wrapper
-https://github.com/yt-dlp/yt-dlp
+### Ref:
+- https://github.com/yt-dlp/yt-dlp
+- https://python-telegram-bot.org/
