@@ -1,4 +1,5 @@
 from dotenv import load_dotenv
+import traceback
 import os
 import re
 from telegram import Update, BotCommand
@@ -33,7 +34,7 @@ async def handle_url(
         await update.message.reply_text("📥 Downloading...")
         try:
             desc, file_path = get_single(
-                url, FOLDER=os.getenv("FOLDER"), EXT=os.getenv("EXT")
+                url, FOLDER=os.getenv("FOLDER", "./downloads/"), EXT=os.getenv("EXT")
             )
             desc += DISCLAIMER
             if return_file:
@@ -44,6 +45,7 @@ async def handle_url(
                 await update.message.reply_text(desc)
             await update.message.reply_text("✅ Download completato!")
         except Exception as e:
+            traceback.print_exc()
             await update.message.reply_text(f"❌ Errore: {str(e)}")
     else:
         print("url non valido!", message_text)
