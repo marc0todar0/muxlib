@@ -9,11 +9,11 @@ from pathvalidate import sanitize_filename
 
 
 class SingleInfo:
-    def __init__(self, title, artist, thumbnail, upload_date, album, filename, tracknr):
+    def __init__(self, title, artist, thumbnail, date, album, filename, tracknr):
         self.title = title
         self.artist = artist
         self.thumbnail = thumbnail
-        self.upload_date = upload_date
+        self.date = date
         self.album = album
         self.filename = filename
         self.tracknr = tracknr
@@ -26,28 +26,36 @@ def get_single_info(url: str) -> SingleInfo:
         )
     with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
         info = ydl.extract_info(url, download=False)
+        print(info)
         title = info.get("title", "output").strip()
         artist = info.get("artist") or info.get("uploader", "Unknown")
         thumbnail = info.get("thumbnail", "No thumbnail")
-        upload_date = info.get("upload_date", "")
+        upload_date = info.get("release_date", "")
     title = re.sub(
         r"\s*\((Visual|Official Video|Lyric Video|Audio|Official Audio)\)\s*",
         "",
         title,
         flags=re.IGNORECASE,
     ).strip()
+    if "(Visual)" in title:
+        title = title.replace("(Visual)", "").strip()
+
+    # Converti virgole in punto e virgola per gli artisti
+    if "," in artist:
+        artist = artist.replace(",", ";")
+
     # if len(title) < 4 or len(title) > 15 or "-" in title or "," in title:
     #   user_input = input(f"Title: {title}\nAccept? [enter] or new title: ").strip()
     # title = title if user_input == "" else user_input
-    TITLE = title.strip()
-    ALBUM = TITLE
-    safe_filename = sanitize_filename(TITLE)
+    title = title.strip()
+    album = title
+    safe_filename = sanitize_filename(title)
     return SingleInfo(
-        title=TITLE,
+        title=title,
         artist=artist,
         thumbnail=thumbnail,
-        upload_date=upload_date,
-        album=ALBUM,
+        date=upload_date,
+        album=album,
         filename=safe_filename,
         tracknr=None,
     )
@@ -81,6 +89,10 @@ def get_single(url: str, FOLDER: str = ".", EXT: str = "mp3") -> tuple[str, str]
             f"title={i.title}",
             "-metadata",
             f"album={i.album}",
+            "-metadata",
+            f"artist={i.artist}",
+            "-metadata",
+            f"date={i.date}",
         ],
         "outtmpl": final_path,
     }
@@ -93,7 +105,7 @@ def get_single(url: str, FOLDER: str = ".", EXT: str = "mp3") -> tuple[str, str]
       Title: {i.title}
       Album: {i.album}
       Artist: {i.artist}
-      Date: {i.upload_date}
+      Date: {i.date}
       Cover: {i.thumbnail}
     """
     print(desc)
