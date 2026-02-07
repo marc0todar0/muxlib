@@ -1,7 +1,8 @@
+from datetime import datetime
 from dotenv import load_dotenv
-import traceback
 import os
 import re
+from single import get_single, get_single_info
 from telegram import Update, BotCommand
 from telegram.ext import (
     ApplicationBuilder,
@@ -10,7 +11,7 @@ from telegram.ext import (
     filters,
     ContextTypes,
 )
-from single import get_single, get_single_info
+import traceback
 
 load_dotenv()
 
@@ -31,12 +32,18 @@ def authorized(user_id: str):
 
 async def myid(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
+    auth = authorized(user.id)
+    default_action = "Send Mp3 file in the chat."
+    if auth:
+        default_action = "Save Mp3 file on the server."
     await update.message.reply_text(
         f"👤 Your Info:\n"
         f"User ID: {user.id}\n"
         f"Username: @{user.username}\n"
         f"Name: {user.first_name} {user.last_name or ''}\n"
-        f"Allowed to save on server: {authorized(user.id)}"
+        f"Allowed to save on server: {authorized(user.id)}\n"
+        f"DEFAULT action on url pasted: {default_action}\n"
+        f"{DISCLAIMER}"
     )
 
 
@@ -71,17 +78,27 @@ async def handle_url(
                 await update.message.reply_text(
                     f"💾 Saving {info.title} by {info.artist} to server..."
                 )
-
-            desc, file_path = get_single(url, FOLDER=folder, EXT=os.getenv("EXT"))
-            desc += DISCLAIMER
+            file_path = get_single(url, FOLDER=folder, EXT=os.getenv("EXT"))
             if return_file:
                 with open(file_path, "rb") as audio:
                     await update.message.reply_audio(audio)
-                    await update.message.reply_text(COMPLETED)
                 os.remove(file_path)
+                await update.message.reply_text(f"✅ Sent: {info.title}")
             else:
-                desc += f"\n{COMPLETED}"
-                await update.message.reply_text(desc)
+                file_size = os.path.getsize(file_path) / (1024 * 1024)
+                date_obj = datetime.strptime(info.date, "%Y%m%d")
+                date = date_obj.strftime("%d/%m/%Y")
+                message = (
+                    f"✅ Saved to server:\n\n"
+                    f"🎵 Title: {info.title}\n"
+                    f"🎤 Artist: {info.artist}\n"
+                    f"💿 Album: {info.album}\n"
+                    f"📅 Date: {date}\n"
+                    f"📁 File: {os.path.basename(file_path)}\n"
+                    f"💾 Size: {file_size:.2f} MB\n"
+                    f"🖼️ Cover: {'✅ Embedded' if info.thumbnail else '❌ None'}"
+                )
+                await update.message.reply_text(message)
         except Exception as e:
             traceback.print_exc()
             await update.message.reply_text(f"❌ Errore: {str(e)}")

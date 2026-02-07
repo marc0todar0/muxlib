@@ -26,7 +26,7 @@ def get_single_info(url: str) -> SingleInfo:
         )
     with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
         info = ydl.extract_info(url, download=False)
-        print(info)
+        # print(info)
         title = info.get("title", "output").strip()
         artist = info.get("artist") or info.get("uploader", "Unknown")
         thumbnail = info.get("thumbnail", "No thumbnail")
@@ -109,7 +109,7 @@ def get_single(url: str, FOLDER: str = ".", EXT: str = "mp3") -> tuple[str, str]
       Cover: {i.thumbnail}
     """
     print(desc)
-    return desc, PATH
+    return PATH
 
 
 if __name__ == "__main__":
