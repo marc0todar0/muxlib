@@ -1,12 +1,13 @@
 services:
   yt-dlp-bot:
     build: .
+    user: "1000:1000"  # Sostituisci con l'output di `id -u` e `id -g`
     container_name: yt-dlp-telegram-bot
     restart: unless-stopped
     env_file:
       - .env
     volumes:
-      - ${FOLDER:-./downloads}:/app/downloads
+      - ${SAVE_FOLDER:-./downloads}:/app/downloads
     environment:
       - PYTHONUNBUFFERED=1
-      - FOLDER=/app/downloads
+      - SAVE_FOLDER=/app/downloads #this env variabile is used first
