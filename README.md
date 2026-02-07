@@ -5,9 +5,10 @@ NB: Its important to keep yt-dlp always updated!
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `/hello` | Greet the user | `/hello` |
-| `/download <url>` | Download a YouTube video and send the MP3 file via Telegram | `/download https://youtube.com/watch?v=VIDEO_ID` |
-| `/save <url>` | Download a YouTube video and save the MP3 file on the server | `/save https://music.youtube.com/watch?v=VIDEO_ID` |
+| `/myid` | Get user informations and authorizations on the server. | `/myid` |
+| `/download <url>` | Send the MP3 file via Telegram | `/download https://youtube.com/watch?v=VIDEO_ID` |
+| `/save <url>` | Save the MP3 file on the server | `/save https://music.youtube.com/watch?v=VIDEO_ID` |
+| `<url>` | Send/Save Mp3 from video url based on the default action (Save if user.id is in ALLOWED_USER, send otherwidse) | `https://music.youtube.com/watch?v=VIDEO_ID` |
 
 ### Supported URL Formats
 
@@ -16,11 +17,16 @@ NB: Its important to keep yt-dlp always updated!
 - `https://music.youtube.com/watch?v=VIDEO_ID`
 - `https://youtu.be/VIDEO_ID`
 
-### Notes
+## ENVIRONMENT
+- TGTOKEN="" # Your Personal Telegram Bot Token
+- SAVE_FOLDER="./downloads/" #path where the /save command store the mp3 files e.g. "/mnt/storage/ROOT/MUSIC/"
+- TMP_FOLDER="./tmp/"        # path where the /download command store and delete the mp3 to send it as a message response
+- USERS_ALLOWED_TO_SAVE="*"  # list of users allowed to save mp3 on the server id1,id2,.. or "*"
+- EXT="mp3"
 
-- You can also send a YouTube URL without any command (default behavior: saves on server without sending the file)
+### Notes
 - Files are automatically tagged with ID3 metadata (title, artist, album, cover art)
 
-### Refs:
+### Dependencies:
 - https://github.com/yt-dlp/yt-dlp
 - https://python-telegram-bot.org/
