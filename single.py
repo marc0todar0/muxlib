@@ -30,7 +30,7 @@ def get_single_info(url: str) -> SingleInfo:
         title = info.get("title", "output").strip()
         artist = info.get("artist") or info.get("uploader", "Unknown")
         thumbnail = info.get("thumbnail", "No thumbnail")
-        upload_date = info.get("release_date", "")
+        upload_date = info.get("release_date", info.get("upload_date", ""))
     title = re.sub(
         r"\s*\((Visual|Official Video|Lyric Video|Audio|Official Audio)\)\s*",
         "",

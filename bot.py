@@ -86,8 +86,10 @@ async def handle_url(
                 await update.message.reply_text(f"✅ Sent: {info.title}")
             else:
                 file_size = os.path.getsize(file_path) / (1024 * 1024)
-                date_obj = datetime.strptime(info.date, "%Y%m%d")
-                date = date_obj.strftime("%d/%m/%Y")
+                date = info.date
+                if info.date:
+                    date_obj = datetime.strptime(info.date, "%Y%m%d")
+                    date = date_obj.strftime("%d/%m/%Y")
                 message = (
                     f"✅ Saved to server:\n\n"
                     f"🎵 Title: {info.title}\n"
