@@ -10,40 +10,72 @@ from telegram.ext import (
     filters,
     ContextTypes,
 )
-from single import get_single
+from single import get_single, get_single_info
 
 load_dotenv()
 
-DISCLAIMER = '\n[NB: Per avere i metadati corretti seleziona i link con la dicitura "Brano" e non "Video"]'
+DISCLAIMER = '[To set metadata automagically paste url of yt "Song" (not "Video")]'
+COMPLETED = "✅ Download Completed!"
+ALLOWED_USERS = (
+    set(os.getenv("USERS_ALLOWED_TO_SAVE", "").split(","))
+    if os.getenv("USERS_ALLOWED_TO_SAVE")
+    else set(["*"])
+)
 
 
-async def hello(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    print("/hello command received")
-    await update.message.reply_text(f"Hello {update.effective_user.first_name}")
+def authorized(user_id: str):
+    if ("*" in ALLOWED_USERS) or (str(user_id) in ALLOWED_USERS):
+        return True
+    return False
+
+
+async def myid(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    await update.message.reply_text(
+        f"👤 Your Info:\n"
+        f"User ID: {user.id}\n"
+        f"Username: @{user.username}\n"
+        f"Name: {user.first_name} {user.last_name or ''}\n"
+        f"Allowed to save on server: {authorized(user.id)}"
+    )
 
 
 async def handle_url(
-    update: Update, context: ContextTypes.DEFAULT_TYPE, return_file: bool = False
+    update: Update, context: ContextTypes.DEFAULT_TYPE, return_file: bool = None
 ) -> None:
+    user_id = update.effective_user.id
+    if return_file is None:
+        # deafult -> only text, no commands
+        # admin user -> DEFAULT is store on server
+        # other user -> DEFAULT is send mp3 response, no response
+        if authorized(user_id):
+            return_file = False
+        else:
+            return_file = True
     message_text = update.message.text
     print(f"handle_url received message_text: {message_text}")
     youtube_regex = r"https?://(www\.)?(youtube\.com/watch\?v=|music\.youtube\.com/watch\?v=|youtu\.be/)[a-zA-Z0-9_-]+"
     match = re.search(youtube_regex, message_text)
+    folder = os.getenv("SAVE_FOLDER", "./downloads/")
+    if return_file:
+        folder = os.getenv("TMP_FOLDER", "./tmp/")
     if match:
         url = match.group(0)
-        await update.message.reply_text("📥 Downloading...")
         try:
-            desc, file_path = get_single(
-                url, FOLDER=os.getenv("FOLDER", "./downloads/"), EXT=os.getenv("EXT")
+            info = get_single_info(url=url)
+            await update.message.reply_text(
+                f"📥 Downloading {info.title} by {info.artist} ..."
             )
+            desc, file_path = get_single(url, FOLDER=folder, EXT=os.getenv("EXT"))
             desc += DISCLAIMER
             if return_file:
                 with open(file_path, "rb") as audio:
                     await update.message.reply_audio(audio)
+                    await update.message.reply_text(COMPLETED)
                 os.remove(file_path)
             else:
+                desc += f"\n{COMPLETED}"
                 await update.message.reply_text(desc)
-            await update.message.reply_text("✅ Download completato!")
         except Exception as e:
             traceback.print_exc()
             await update.message.reply_text(f"❌ Errore: {str(e)}")
@@ -65,26 +97,32 @@ async def download_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = update.effective_user.id
+    if not authorized(user_id):
+        await update.message.reply_text(
+            "❌ You are not authorized to save files on the server!"
+        )
+        return
     await handle_url(update, context, return_file=False)
 
 
 async def post_init(application):
-    """Imposta i comandi del bot dopo l'inizializzazione"""
     await application.bot.set_my_commands(
         [
-            BotCommand("hello", "Saluta l'utente"),
-            BotCommand("download", "Invia MP3 in chat - /download <url>"),
-            BotCommand("save", "Salva MP3 sul server - /save <url>"),
+            BotCommand("myid", "Get your user ID"),
+            BotCommand("download", "📥 Download and send MP3 file"),
+            BotCommand("save", "💾 Save MP3 to server (admin only)"),
         ]
     )
 
 
 app = ApplicationBuilder().token(os.getenv("TGTOKEN")).post_init(post_init).build()
 
-app.add_handler(CommandHandler("hello", hello))
-app.add_handler(CommandHandler("download", download_command))  # Scarica e invia file
-app.add_handler(CommandHandler("save", save_command))  # Scarica senza inviare
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, save_command))
-# filters.TEXT & ~filters.COMMAND = "messaggi di testo che non sono comandi"
+app.add_handler(
+    CommandHandler("download", download_command)
+)  # Download on tmp folder send and then delete the mp3
+app.add_handler(CommandHandler("save", save_command))  # Download without send
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_url))
+app.add_handler(CommandHandler("myid", myid))
 print("Bot Starting...")
 app.run_polling()

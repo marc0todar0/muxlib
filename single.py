@@ -8,7 +8,18 @@ import yt_dlp  # require ffmpeg to work
 from pathvalidate import sanitize_filename
 
 
-def get_single(url: str, FOLDER: str = ".", EXT: str = "mp3") -> tuple[str, str]:
+class SingleInfo:
+    def __init__(self, title, artist, thumbnail, upload_date, album, filename, tracknr):
+        self.title = title
+        self.artist = artist
+        self.thumbnail = thumbnail
+        self.upload_date = upload_date
+        self.album = album
+        self.filename = filename
+        self.tracknr = tracknr
+
+
+def get_single_info(url: str) -> SingleInfo:
     if "playlist" in url:
         raise Exception(
             "get_single cannot download an album/playlist. Please use get_album/get_playlist"
@@ -31,7 +42,20 @@ def get_single(url: str, FOLDER: str = ".", EXT: str = "mp3") -> tuple[str, str]
     TITLE = title.strip()
     ALBUM = TITLE
     safe_filename = sanitize_filename(TITLE)
-    final_path = os.path.join(FOLDER, f"{safe_filename}")
+    return SingleInfo(
+        title=TITLE,
+        artist=artist,
+        thumbnail=thumbnail,
+        upload_date=upload_date,
+        album=ALBUM,
+        filename=safe_filename,
+        tracknr=None,
+    )
+
+
+def get_single(url: str, FOLDER: str = ".", EXT: str = "mp3") -> tuple[str, str]:
+    i = get_single_info(url=url)
+    final_path = os.path.join(FOLDER, f"{i.filename}")
     ydl_opts = {
         "format": "bestaudio/best",
         "writethumbnail": True,
@@ -54,9 +78,9 @@ def get_single(url: str, FOLDER: str = ".", EXT: str = "mp3") -> tuple[str, str]
         ],
         "postprocessor_args": [
             "-metadata",
-            f"title={TITLE}",
+            f"title={i.title}",
             "-metadata",
-            f"album={ALBUM}",
+            f"album={i.album}",
         ],
         "outtmpl": final_path,
     }
@@ -65,14 +89,12 @@ def get_single(url: str, FOLDER: str = ".", EXT: str = "mp3") -> tuple[str, str]
     PATH = f"{final_path}.{EXT}"
     file_size_bytes = os.path.getsize(PATH)
     file_size_mb = file_size_bytes / (1024 * 1024)
-    desc = f"""File salvato come: {PATH}
-    Dimensione: {file_size_mb:.2f} MB
-    METADATA:
-      Title: {TITLE}
-      Album: {ALBUM}
-      Artist: {artist}
-      Date: {upload_date}
-      Cover:  Embedded (from {thumbnail})
+    desc = f"""File saved: {PATH} [{file_size_mb:.2f} MB]
+      Title: {i.title}
+      Album: {i.album}
+      Artist: {i.artist}
+      Date: {i.upload_date}
+      Cover: {i.thumbnail}
     """
     print(desc)
     return desc, PATH
