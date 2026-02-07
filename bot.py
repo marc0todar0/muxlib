@@ -63,9 +63,15 @@ async def handle_url(
         url = match.group(0)
         try:
             info = get_single_info(url=url)
-            await update.message.reply_text(
-                f"📥 Downloading {info.title} by {info.artist} ..."
-            )
+            if return_file:
+                await update.message.reply_text(
+                    f"📥 Downloading {info.title} by {info.artist}..."
+                )
+            else:
+                await update.message.reply_text(
+                    f"💾 Saving {info.title} by {info.artist} to server..."
+                )
+
             desc, file_path = get_single(url, FOLDER=folder, EXT=os.getenv("EXT"))
             desc += DISCLAIMER
             if return_file:
