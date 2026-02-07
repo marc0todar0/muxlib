@@ -31,15 +31,8 @@ def get_single_info(url: str) -> SingleInfo:
         artist = info.get("artist") or info.get("uploader", "Unknown")
         thumbnail = info.get("thumbnail", "No thumbnail")
         upload_date = info.get("release_date", info.get("upload_date", ""))
-    title = re.sub(
-        r"\s*\((Visual|Official Video|Lyric Video|Audio|Official Audio)\)\s*",
-        "",
-        title,
-        flags=re.IGNORECASE,
-    ).strip()
-    if "(Visual)" in title:
-        title = title.replace("(Visual)", "").strip()
-
+    # Rimuovi tutto dentro (), [] e anche "(Visual)"
+    title = re.sub(r'\s*[\(\[].*?[\)\]]\s*', '', title).strip()
     # Converti virgole in punto e virgola per gli artisti
     if "," in artist:
         artist = artist.replace(",", ";")
