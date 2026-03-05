@@ -24,6 +24,15 @@ NB: Its important to keep yt-dlp always updated!
 - USERS_ALLOWED_TO_SAVE="*"  # list of users allowed to save mp3 on the server id1,id2,.. or "*"
 - EXT="mp3"
 
+## Testing
+
+Requires `ffmpeg` installed and network access (tests hit real YouTube).
+
+```bash
+pip install pytest
+python -m pytest
+```
+
 ### Notes
 - Files are automatically tagged with ID3 metadata (title, artist, album, cover art)
 

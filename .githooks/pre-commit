@@ -1,0 +1,10 @@
+#!/bin/bash
+set -e
+
+echo "Running ruff..."
+ruff check .
+
+echo "Running pyright..."
+pyright
+
+echo "All checks passed!"
