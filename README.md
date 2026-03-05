@@ -25,12 +25,20 @@ NB: Its important to keep yt-dlp always updated!
 - USERS_ALLOWED_TO_SAVE="*"  # list of users allowed to save mp3 on the server id1,id2,.. or "*"
 - EXT="mp3"
 
+## Development Setup
+
+```bash
+pip install -r requirements-dev.txt
+cp pre-commit .git/hooks/pre-commit
+```
+
+This installs dev tools (ruff, pyright, pytest) and enables the pre-commit hook that runs linting before each commit.
+
 ## Testing
 
 Requires `ffmpeg` installed and network access (tests hit real YouTube).
 
 ```bash
-pip install pytest
 python -m pytest
 ```
 
