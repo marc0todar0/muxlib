@@ -23,8 +23,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code
 COPY . .
 
-# Create download directory
-RUN mkdir -p /app/downloads
+# Create download and tmp directories (writable by any user)
+RUN mkdir -p /app/downloads /app/tmp && chmod 777 /app/tmp
 
 # Run the bot
 CMD ["python", "-m", "bot"]

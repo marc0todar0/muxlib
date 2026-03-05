@@ -1,5 +1,6 @@
 import os
 import re
+import shutil
 import traceback
 from datetime import datetime
 
@@ -15,6 +16,7 @@ from telegram.ext import (
 )
 
 from single import get_single, get_single_info
+from album import get_album, get_album_info
 
 load_dotenv()
 
@@ -46,7 +48,9 @@ async def myid(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     user = update.effective_user
     auth = authorized(user.id)
-    default_action = "Save Mp3 file on the server." if auth else "Send Mp3 file in the chat."
+    default_action = (
+        "Save Mp3 file on the server." if auth else "Send Mp3 file in the chat."
+    )
     await update.message.reply_text(
         f"👤 Your Info:\n"
         f"User ID: {user.id}\n"
@@ -56,6 +60,50 @@ async def myid(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"DEFAULT action on url pasted: {default_action}\n"
         f"{DISCLAIMER}"
     )
+
+
+async def handle_album_url(
+    update: Update, url: str, return_file: bool, folder: str
+) -> None:
+    assert update.message is not None
+    try:
+        info = get_album_info(url)
+        action = "📥 Downloading" if return_file else "💾 Saving"
+        await update.message.reply_text(
+            f"{action} album: {info.title} by {info.artist} ({len(info.tracks)} tracks)..."
+        )
+        album_info, file_paths = get_album(
+            url, FOLDER=folder, EXT=os.getenv("EXT", "mp3")
+        )
+        if return_file:
+            for fp in file_paths:
+                with open(fp, "rb") as audio:
+                    await update.message.reply_audio(audio)
+            album_folder = os.path.dirname(file_paths[0])
+            shutil.rmtree(album_folder)
+            await update.message.reply_text(
+                f"✅ Sent album: {album_info.title} ({len(file_paths)} tracks)"
+            )
+        else:
+            total_size = sum(
+                os.path.getsize(fp) / (1024 * 1024) for fp in file_paths
+            )
+            date = album_info.date
+            if date:
+                date_obj = datetime.strptime(date, "%Y%m%d")
+                date = date_obj.strftime("%d/%m/%Y")
+            message = (
+                f"✅ Album saved to server:\n\n"
+                f"💿 Album: {album_info.title}\n"
+                f"🎤 Artist: {album_info.artist}\n"
+                f"📅 Date: {date}\n"
+                f"🎵 Tracks: {len(file_paths)}\n"
+                f"💾 Total size: {total_size:.2f} MB"
+            )
+            await update.message.reply_text(message)
+    except Exception as e:
+        traceback.print_exc()
+        await update.message.reply_text(f"❌ Errore: {str(e)}")
 
 
 async def handle_url(
@@ -70,11 +118,16 @@ async def handle_url(
         return_file = not authorized(user_id)
     message_text = update.message.text or ""
     print(f"handle_url received message_text: {message_text}")
+    playlist_regex = r"https?://(www\.)?(youtube\.com|music\.youtube\.com)/playlist\?list=[a-zA-Z0-9_-]+"
     youtube_regex = r"https?://(www\.)?(youtube\.com/watch\?v=|music\.youtube\.com/watch\?v=|youtu\.be/)[a-zA-Z0-9_-]+"
-    match = re.search(youtube_regex, message_text)
     folder = os.getenv("SAVE_FOLDER", "./downloads/")
     if return_file:
         folder = os.getenv("TMP_FOLDER", "./tmp/")
+    playlist_match = re.search(playlist_regex, message_text)
+    if playlist_match:
+        await handle_album_url(update, playlist_match.group(0), return_file, folder)
+        return
+    match = re.search(youtube_regex, message_text)
     if match:
         url = match.group(0)
         try:
@@ -120,7 +173,8 @@ async def handle_url(
             "Formati accettati:\n"
             "• https://www.youtube.com/watch?v=VIDEO_ID\n"
             "• https://music.youtube.com/watch?v=VIDEO_ID\n"
-            "• https://youtu.be/VIDEO_ID"
+            "• https://youtu.be/VIDEO_ID\n"
+            "• https://music.youtube.com/playlist?list=PLAYLIST_ID\n"
             f"{DISCLAIMER}"
         )
         await update.message.reply_text(reply_text)
@@ -134,6 +188,8 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     assert update.effective_user is not None
     assert update.message is not None
     user_id = update.effective_user.id
+    if not allowed(user_id):
+        return
     if not authorized(user_id):
         await update.message.reply_text(
             "❌ You are not authorized to save files on the server!"

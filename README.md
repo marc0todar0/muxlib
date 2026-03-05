@@ -46,7 +46,7 @@ This installs dev tools (ruff, pyright, pytest) and enables the pre-commit hook 
 Requires `ffmpeg` installed and network access (tests hit real YouTube).
 
 ```bash
-python -m pytest
+python -m pytest -v
 ```
 
 ### Notes
