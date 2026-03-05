@@ -32,6 +32,9 @@ BOT_USERS: set[str] = (
     else {"*"}
 )
 
+PLAYLIST_REGEX = r"https?://(www\.)?(youtube\.com|music\.youtube\.com)/playlist\?list=[a-zA-Z0-9_-]+"
+SINGLE_REGEX = r"https?://(www\.)?(youtube\.com/watch\?v=|music\.youtube\.com/watch\?v=|youtu\.be/)[a-zA-Z0-9_-]+"
+
 
 def allowed(user_id: int) -> bool:
     return "*" in BOT_USERS or str(user_id) in BOT_USERS
@@ -39,6 +42,22 @@ def allowed(user_id: int) -> bool:
 
 def authorized(user_id: int) -> bool:
     return "*" in ALLOWED_USERS or str(user_id) in ALLOWED_USERS
+
+
+def format_date(date: str) -> str:
+    if not date:
+        return ""
+    return datetime.strptime(date, "%Y%m%d").strftime("%d/%m/%Y")
+
+
+def get_folder(return_file: bool) -> str:
+    if return_file:
+        return os.getenv("TMP_FOLDER", "./tmp/")
+    return os.getenv("SAVE_FOLDER", "./downloads/")
+
+
+def get_ext() -> str:
+    return os.getenv("EXT", "mp3")
 
 
 async def myid(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -62,6 +81,40 @@ async def myid(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
+async def handle_single_url(
+    update: Update, url: str, return_file: bool, folder: str
+) -> None:
+    assert update.message is not None
+    try:
+        info = get_single_info(url=url)
+        action = "📥 Downloading" if return_file else "💾 Saving"
+        await update.message.reply_text(
+            f"{action} {info.title} by {info.artist}..."
+        )
+        file_path = get_single(url, FOLDER=folder, EXT=get_ext())
+        if return_file:
+            with open(file_path, "rb") as audio:
+                await update.message.reply_audio(audio)
+            os.remove(file_path)
+            await update.message.reply_text(f"✅ Sent: {info.title}")
+        else:
+            file_size = os.path.getsize(file_path) / (1024 * 1024)
+            message = (
+                f"✅ Saved to server:\n\n"
+                f"🎵 Title: {info.title}\n"
+                f"🎤 Artist: {info.artist}\n"
+                f"💿 Album: {info.album}\n"
+                f"📅 Date: {format_date(info.date)}\n"
+                f"📁 File: {os.path.basename(file_path)}\n"
+                f"💾 Size: {file_size:.2f} MB\n"
+                f"🖼️ Cover: {'✅ Embedded' if info.thumbnail else '❌ None'}"
+            )
+            await update.message.reply_text(message)
+    except Exception as e:
+        traceback.print_exc()
+        await update.message.reply_text(f"❌ Errore: {str(e)}")
+
+
 async def handle_album_url(
     update: Update, url: str, return_file: bool, folder: str
 ) -> None:
@@ -72,9 +125,7 @@ async def handle_album_url(
         await update.message.reply_text(
             f"{action} album: {info.title} by {info.artist} ({len(info.tracks)} tracks)..."
         )
-        album_info, file_paths = get_album(
-            url, FOLDER=folder, EXT=os.getenv("EXT", "mp3")
-        )
+        album_info, file_paths = get_album(url, FOLDER=folder, EXT=get_ext())
         if return_file:
             for fp in file_paths:
                 with open(fp, "rb") as audio:
@@ -88,15 +139,11 @@ async def handle_album_url(
             total_size = sum(
                 os.path.getsize(fp) / (1024 * 1024) for fp in file_paths
             )
-            date = album_info.date
-            if date:
-                date_obj = datetime.strptime(date, "%Y%m%d")
-                date = date_obj.strftime("%d/%m/%Y")
             message = (
                 f"✅ Album saved to server:\n\n"
                 f"💿 Album: {album_info.title}\n"
                 f"🎤 Artist: {album_info.artist}\n"
-                f"📅 Date: {date}\n"
+                f"📅 Date: {format_date(album_info.date)}\n"
                 f"🎵 Tracks: {len(file_paths)}\n"
                 f"💾 Total size: {total_size:.2f} MB"
             )
@@ -116,68 +163,29 @@ async def handle_url(
         return
     if return_file is None:
         return_file = not authorized(user_id)
+
     message_text = update.message.text or ""
-    print(f"handle_url received message_text: {message_text}")
-    playlist_regex = r"https?://(www\.)?(youtube\.com|music\.youtube\.com)/playlist\?list=[a-zA-Z0-9_-]+"
-    youtube_regex = r"https?://(www\.)?(youtube\.com/watch\?v=|music\.youtube\.com/watch\?v=|youtu\.be/)[a-zA-Z0-9_-]+"
-    folder = os.getenv("SAVE_FOLDER", "./downloads/")
-    if return_file:
-        folder = os.getenv("TMP_FOLDER", "./tmp/")
-    playlist_match = re.search(playlist_regex, message_text)
+    folder = get_folder(return_file)
+
+    playlist_match = re.search(PLAYLIST_REGEX, message_text)
     if playlist_match:
         await handle_album_url(update, playlist_match.group(0), return_file, folder)
         return
-    match = re.search(youtube_regex, message_text)
-    if match:
-        url = match.group(0)
-        try:
-            info = get_single_info(url=url)
-            if return_file:
-                await update.message.reply_text(
-                    f"📥 Downloading {info.title} by {info.artist}..."
-                )
-            else:
-                await update.message.reply_text(
-                    f"💾 Saving {info.title} by {info.artist} to server..."
-                )
-            file_path = get_single(url, FOLDER=folder, EXT=os.getenv("EXT", "mp3"))
-            if return_file:
-                with open(file_path, "rb") as audio:
-                    await update.message.reply_audio(audio)
-                os.remove(file_path)
-                await update.message.reply_text(f"✅ Sent: {info.title}")
-            else:
-                file_size = os.path.getsize(file_path) / (1024 * 1024)
-                date = info.date
-                if info.date:
-                    date_obj = datetime.strptime(info.date, "%Y%m%d")
-                    date = date_obj.strftime("%d/%m/%Y")
-                message = (
-                    f"✅ Saved to server:\n\n"
-                    f"🎵 Title: {info.title}\n"
-                    f"🎤 Artist: {info.artist}\n"
-                    f"💿 Album: {info.album}\n"
-                    f"📅 Date: {date}\n"
-                    f"📁 File: {os.path.basename(file_path)}\n"
-                    f"💾 Size: {file_size:.2f} MB\n"
-                    f"🖼️ Cover: {'✅ Embedded' if info.thumbnail else '❌ None'}"
-                )
-                await update.message.reply_text(message)
-        except Exception as e:
-            traceback.print_exc()
-            await update.message.reply_text(f"❌ Errore: {str(e)}")
-    else:
-        print("url non valido!", message_text)
-        reply_text = (
-            "❌ Formato URL non valido!\n\n"
-            "Formati accettati:\n"
-            "• https://www.youtube.com/watch?v=VIDEO_ID\n"
-            "• https://music.youtube.com/watch?v=VIDEO_ID\n"
-            "• https://youtu.be/VIDEO_ID\n"
-            "• https://music.youtube.com/playlist?list=PLAYLIST_ID\n"
-            f"{DISCLAIMER}"
-        )
-        await update.message.reply_text(reply_text)
+
+    single_match = re.search(SINGLE_REGEX, message_text)
+    if single_match:
+        await handle_single_url(update, single_match.group(0), return_file, folder)
+        return
+
+    await update.message.reply_text(
+        "❌ Formato URL non valido!\n\n"
+        "Formati accettati:\n"
+        "• https://www.youtube.com/watch?v=VIDEO_ID\n"
+        "• https://music.youtube.com/watch?v=VIDEO_ID\n"
+        "• https://youtu.be/VIDEO_ID\n"
+        "• https://music.youtube.com/playlist?list=PLAYLIST_ID\n"
+        f"{DISCLAIMER}"
+    )
 
 
 async def download_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
