@@ -1,15 +1,24 @@
+from __future__ import annotations
+
 import os
 import re
-import yt_dlp  # require ffmpeg to work
+from typing import Any
 
-# sudo apt install ffmpeg
-# force reinstall yt-dlp
-# pip install --upgrade --force-reinstall -r requirements.txt
+import yt_dlp
 from pathvalidate import sanitize_filename
 
 
 class SingleInfo:
-    def __init__(self, title, artist, thumbnail, date, album, filename, tracknr):
+    def __init__(
+        self,
+        title: str,
+        artist: str,
+        thumbnail: str,
+        date: str,
+        album: str,
+        filename: str,
+        tracknr: int | None,
+    ) -> None:
         self.title = title
         self.artist = artist
         self.thumbnail = thumbnail
@@ -25,7 +34,7 @@ def get_single_info(url: str) -> SingleInfo:
             "get_single cannot download an album/playlist. Please use get_album/get_playlist"
         )
     with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
-        info = ydl.extract_info(url, download=False)
+        info: dict[str, Any] = ydl.extract_info(url, download=False) or {}  # type: ignore[reportAssignmentType]
         metadata_keys = [
             "title", "track", "artist", "artists", "creator", "uploader",
             "album", "album_artist", "thumbnail", "release_date", "upload_date",
@@ -35,21 +44,16 @@ def get_single_info(url: str) -> SingleInfo:
         for k in metadata_keys:
             print(f"  {k}: {info.get(k)!r}")
         print("---")
-        title = info.get("track") or info.get("title", "output").strip()
-        artist = info.get("artist") or info.get("uploader", "Unknown")
-        thumbnail = info.get("thumbnail", "No thumbnail")
-        upload_date = info.get("release_date") or info.get("upload_date", "")
-    # Rimuovi tutto dentro (), [] e anche "(Visual)"
+        title: str = info.get("track") or info.get("title") or "output"
+        artist: str = info.get("artist") or info.get("uploader") or "Unknown"
+        thumbnail: str = info.get("thumbnail") or "No thumbnail"
+        upload_date: str = info.get("release_date") or info.get("upload_date") or ""
     title = re.sub(r'\s*[\(\[].*?[\)\]]\s*', '', title).strip()
-    # Converti virgole in punto e virgola per gli artisti
     if "," in artist:
         artist = artist.replace(",", ";")
 
-    # if len(title) < 4 or len(title) > 15 or "-" in title or "," in title:
-    #   user_input = input(f"Title: {title}\nAccept? [enter] or new title: ").strip()
-    # title = title if user_input == "" else user_input
     title = title.strip()
-    album = info.get("album") or title
+    album: str = info.get("album") or title
     safe_filename = sanitize_filename(title)
     return SingleInfo(
         title=title,
@@ -62,13 +66,12 @@ def get_single_info(url: str) -> SingleInfo:
     )
 
 
-def get_single(url: str, FOLDER: str = ".", EXT: str = "mp3") -> tuple[str, str]:
+def get_single(url: str, FOLDER: str = ".", EXT: str = "mp3") -> str:
     i = get_single_info(url=url)
     final_path = os.path.join(FOLDER, f"{i.filename}")
-    ydl_opts = {
+    ydl_opts: dict[str, Any] = {
         "format": "bestaudio/best",
         "writethumbnail": True,
-        #'embedthumbnail': True,
         "quiet": False,
         "no_warnings": True,
         "postprocessors": [
@@ -97,12 +100,12 @@ def get_single(url: str, FOLDER: str = ".", EXT: str = "mp3") -> tuple[str, str]
         ],
         "outtmpl": final_path,
     }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:  # type: ignore[reportArgumentType]
         ydl.download([url])
-    PATH = f"{final_path}.{EXT}"
-    file_size_bytes = os.path.getsize(PATH)
+    file_path = f"{final_path}.{EXT}"
+    file_size_bytes = os.path.getsize(file_path)
     file_size_mb = file_size_bytes / (1024 * 1024)
-    desc = f"""File saved: {PATH} [{file_size_mb:.2f} MB]
+    desc = f"""File saved: {file_path} [{file_size_mb:.2f} MB]
       Title: {i.title}
       Album: {i.album}
       Artist: {i.artist}
@@ -110,7 +113,7 @@ def get_single(url: str, FOLDER: str = ".", EXT: str = "mp3") -> tuple[str, str]
       Cover: {i.thumbnail}
     """
     print(desc)
-    return PATH
+    return file_path
 
 
 if __name__ == "__main__":

@@ -1,65 +1,63 @@
-from datetime import datetime
-from dotenv import load_dotenv
+from __future__ import annotations
+
 import os
 import re
-from single import get_single, get_single_info
+import traceback
+from datetime import datetime
+
+from dotenv import load_dotenv
 from telegram import Update, BotCommand
 from telegram.ext import (
+    Application,
     ApplicationBuilder,
     CommandHandler,
     MessageHandler,
     filters,
     ContextTypes,
 )
-import traceback
+
+from single import get_single, get_single_info
 
 load_dotenv()
 
 DISCLAIMER = '[To set metadata automagically paste url of yt "Song" (not "Video")]'
-COMPLETED = "✅ Download Completed!"
-ALLOWED_USERS = (
+ALLOWED_USERS: set[str] = (
     set(os.getenv("USERS_ALLOWED_TO_SAVE", "").split(","))
     if os.getenv("USERS_ALLOWED_TO_SAVE")
-    else set(["*"])
+    else {"*"}
 )
 
 
-def authorized(user_id: str):
-    if ("*" in ALLOWED_USERS) or (str(user_id) in ALLOWED_USERS):
-        return True
-    return False
+def authorized(user_id: int) -> bool:
+    return "*" in ALLOWED_USERS or str(user_id) in ALLOWED_USERS
 
 
 async def myid(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    assert update.effective_user is not None
+    assert update.message is not None
     user = update.effective_user
     auth = authorized(user.id)
-    default_action = "Send Mp3 file in the chat."
-    if auth:
-        default_action = "Save Mp3 file on the server."
+    default_action = "Save Mp3 file on the server." if auth else "Send Mp3 file in the chat."
     await update.message.reply_text(
         f"👤 Your Info:\n"
         f"User ID: {user.id}\n"
         f"Username: @{user.username}\n"
         f"Name: {user.first_name} {user.last_name or ''}\n"
-        f"Allowed to save on server: {authorized(user.id)}\n"
+        f"Allowed to save on server: {auth}\n"
         f"DEFAULT action on url pasted: {default_action}\n"
         f"{DISCLAIMER}"
     )
 
 
 async def handle_url(
-    update: Update, context: ContextTypes.DEFAULT_TYPE, return_file: bool = None
+    update: Update, context: ContextTypes.DEFAULT_TYPE, return_file: bool | None = None
 ) -> None:
+    assert update.effective_user is not None
+    assert update.message is not None
     user_id = update.effective_user.id
     if return_file is None:
-        # deafult -> only text, no commands
-        # admin user -> DEFAULT is store on server
-        # other user -> DEFAULT is send mp3 response, no response
-        if authorized(user_id):
-            return_file = False
-        else:
-            return_file = True
-    message_text = update.message.text
+        return_file = not authorized(user_id)
+    message_text = update.message.text or ""
     print(f"handle_url received message_text: {message_text}")
     youtube_regex = r"https?://(www\.)?(youtube\.com/watch\?v=|music\.youtube\.com/watch\?v=|youtu\.be/)[a-zA-Z0-9_-]+"
     match = re.search(youtube_regex, message_text)
@@ -78,7 +76,7 @@ async def handle_url(
                 await update.message.reply_text(
                     f"💾 Saving {info.title} by {info.artist} to server..."
                 )
-            file_path = get_single(url, FOLDER=folder, EXT=os.getenv("EXT"))
+            file_path = get_single(url, FOLDER=folder, EXT=os.getenv("EXT", "mp3"))
             if return_file:
                 with open(file_path, "rb") as audio:
                     await update.message.reply_audio(audio)
@@ -122,6 +120,8 @@ async def download_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    assert update.effective_user is not None
+    assert update.message is not None
     user_id = update.effective_user.id
     if not authorized(user_id):
         await update.message.reply_text(
@@ -131,7 +131,7 @@ async def save_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await handle_url(update, context, return_file=False)
 
 
-async def post_init(application):
+async def post_init(application: Application) -> None:  # type: ignore[type-arg]
     await application.bot.set_my_commands(
         [
             BotCommand("myid", "Get your user ID"),
@@ -141,12 +141,12 @@ async def post_init(application):
     )
 
 
-app = ApplicationBuilder().token(os.getenv("TGTOKEN")).post_init(post_init).build()
+token = os.getenv("TGTOKEN")
+assert token is not None, "TGTOKEN environment variable is required"
+app = ApplicationBuilder().token(token).post_init(post_init).build()
 
-app.add_handler(
-    CommandHandler("download", download_command)
-)  # Download on tmp folder send and then delete the mp3
-app.add_handler(CommandHandler("save", save_command))  # Download without send
+app.add_handler(CommandHandler("download", download_command))
+app.add_handler(CommandHandler("save", save_command))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_url))
 app.add_handler(CommandHandler("myid", myid))
 print("Bot Starting...")

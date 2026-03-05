@@ -27,6 +27,11 @@ def main():
         help="Output folder (default: SAVE_FOLDER env or ./downloads/)",
     )
     parser.add_argument(
+        "--ext",
+        default=os.getenv("EXT", "mp3"),
+        help="Audio format (default: EXT env or mp3)",
+    )
+    parser.add_argument(
         "--info-only",
         action="store_true",
         help="Only show yt-dlp metadata, don't download",
