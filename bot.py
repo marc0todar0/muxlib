@@ -24,6 +24,15 @@ ALLOWED_USERS: set[str] = (
     if os.getenv("USERS_ALLOWED_TO_SAVE")
     else {"*"}
 )
+BOT_USERS: set[str] = (
+    set(os.getenv("USERS_ALLOWED", "").split(","))
+    if os.getenv("USERS_ALLOWED")
+    else {"*"}
+)
+
+
+def allowed(user_id: int) -> bool:
+    return "*" in BOT_USERS or str(user_id) in BOT_USERS
 
 
 def authorized(user_id: int) -> bool:
@@ -33,6 +42,8 @@ def authorized(user_id: int) -> bool:
 async def myid(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     assert update.effective_user is not None
     assert update.message is not None
+    if not allowed(update.effective_user.id):
+        return
     user = update.effective_user
     auth = authorized(user.id)
     default_action = "Save Mp3 file on the server." if auth else "Send Mp3 file in the chat."
@@ -53,6 +64,8 @@ async def handle_url(
     assert update.effective_user is not None
     assert update.message is not None
     user_id = update.effective_user.id
+    if not allowed(user_id):
+        return
     if return_file is None:
         return_file = not authorized(user_id)
     message_text = update.message.text or ""
