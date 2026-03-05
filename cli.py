@@ -42,14 +42,32 @@ def main():
         action="store_true",
         help="Show ID3 tags of the downloaded file (mid3v2)",
     )
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument(
+        "--album",
+        action="store_true",
+        help="Force album mode (override auto-detection)",
+    )
+    mode_group.add_argument(
+        "--playlist",
+        action="store_true",
+        help="Force playlist mode (override auto-detection)",
+    )
     args = parser.parse_args()
 
     is_playlist = "playlist" in args.url
 
+    force_album: bool | None = None
+    if args.album:
+        force_album = True
+    elif args.playlist:
+        force_album = False
+
     if args.info_only:
         if is_playlist:
-            info = get_album_info(args.url)
-            print(f"Album:     {info.title}")
+            info = get_album_info(args.url, force_album=force_album)
+            label = "Album" if info.is_album else "Playlist"
+            print(f"{label}:    {info.title}")
             print(f"Artist:    {info.artist}")
             print(f"Date:      {info.date}")
             print(f"Thumbnail: {info.thumbnail}")
@@ -66,8 +84,9 @@ def main():
     else:
         os.makedirs(args.output, exist_ok=True)
         if is_playlist:
-            album_info, paths = get_album(args.url, FOLDER=args.output, EXT=args.ext)
-            print(f"\nAlbum saved: {album_info.title} ({len(paths)} tracks)")
+            album_info, paths = get_album(args.url, FOLDER=args.output, EXT=args.ext, force_album=force_album)
+            label = "Album" if album_info.is_album else "Playlist"
+            print(f"\n{label} saved: {album_info.title} ({len(paths)} tracks)")
             for p in paths:
                 print(f"  {p}")
                 if args.tags:

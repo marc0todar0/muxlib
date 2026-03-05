@@ -16,6 +16,25 @@ NB: Its important to keep yt-dlp always updated!
 - `https://youtube.com/watch?v=VIDEO_ID`
 - `https://music.youtube.com/watch?v=VIDEO_ID`
 - `https://youtu.be/VIDEO_ID`
+- `https://music.youtube.com/playlist?list=PLAYLIST_ID`
+
+### Album vs Playlist Detection
+
+When a playlist URL is sent, the bot auto-detects whether it's an **album** or a **user-curated playlist**:
+
+- **Album**: all tracks share the same `album` metadata field, or the playlist title starts with "Album - ". Tracks get numbered (`01`, `02`, ...) and share the album name in ID3 tags.
+- **Playlist**: tracks come from different albums/artists. Each track keeps its own original metadata (artist, album). No track numbering in ID3 tags.
+
+You can override detection by adding a flag to the message:
+
+| Flag | Effect |
+|------|--------|
+| `--album` | Force album mode (shared album name, track numbers) |
+| `--playlist` | Force playlist mode (each track keeps its own metadata) |
+
+**Telegram example:** `--playlist https://music.youtube.com/playlist?list=PLAYLIST_ID`
+
+**CLI example:** `python cli.py --playlist --info-only <playlist_url>`
 
 
 ## ENVIRONMENT

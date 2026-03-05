@@ -16,19 +16,38 @@ class AlbumInfo:
     date: str
     thumbnail: str
     folder_name: str
+    is_album: bool = True
     tracks: list[SingleInfo] = field(default_factory=list)
     track_urls: list[str] = field(default_factory=list)
 
 
-def get_album_info(url: str) -> AlbumInfo:
+def detect_is_album(info: dict[str, Any]) -> bool:
+    title: str = info.get("title") or ""
+    if re.match(r"^album\s*-\s*", title, flags=re.IGNORECASE):
+        return True
+
+    entries = list(info.get("entries") or [])
+    if not entries:
+        return False
+
+    albums = [e.get("album") for e in entries if e.get("album", "").strip()]
+    if len(albums) != len(entries) or len(set(albums)) != 1:
+        return False
+    return bool(albums[0] and albums[0].strip())
+
+
+def get_album_info(url: str, force_album: bool | None = None) -> AlbumInfo:
     if "playlist" not in url:
         raise ValueError("get_album_info requires a playlist/album URL.")
 
     with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
         info: dict[str, Any] = ydl.extract_info(url, download=False) or {}  # type: ignore[reportAssignmentType]
 
+    is_album = force_album if force_album is not None else detect_is_album(info)
+
     album_title: str = info.get("title") or "Unknown Album"
-    album_title = re.sub(r"^album\s*-\s*", "", album_title, flags=re.IGNORECASE).strip()
+    if is_album:
+        album_title = re.sub(r"^album\s*-\s*", "", album_title, flags=re.IGNORECASE).strip()
     album_thumbnail: str = info.get("thumbnail") or ""
     album_date: str = ""
 
@@ -46,7 +65,12 @@ def get_album_info(url: str) -> AlbumInfo:
         artist = clean_artist(entry.get("artist") or entry.get("uploader") or album_artist)
         thumbnail = entry.get("thumbnail") or album_thumbnail
         date = entry.get("release_date") or entry.get("upload_date") or ""
-        tracknr = entry.get("playlist_index")
+        tracknr = entry.get("playlist_index") if is_album else None
+
+        if is_album:
+            album = album_title
+        else:
+            album = entry.get("album") or clean_title(entry.get("track") or entry.get("title") or "Unknown")
 
         if not album_date and date:
             album_date = date
@@ -57,7 +81,7 @@ def get_album_info(url: str) -> AlbumInfo:
                 artist=artist,
                 thumbnail=thumbnail,
                 date=date,
-                album=album_title,
+                album=album,
                 filename=sanitize_filename(title),
                 tracknr=tracknr,
             )
@@ -70,13 +94,14 @@ def get_album_info(url: str) -> AlbumInfo:
         date=album_date,
         thumbnail=album_thumbnail,
         folder_name=sanitize_filename(album_title),
+        is_album=is_album,
         tracks=tracks,
         track_urls=track_urls,
     )
 
 
-def get_album(url: str, FOLDER: str = ".", EXT: str = "mp3") -> tuple[AlbumInfo, list[str]]:
-    album_info = get_album_info(url)
+def get_album(url: str, FOLDER: str = ".", EXT: str = "mp3", force_album: bool | None = None) -> tuple[AlbumInfo, list[str]]:
+    album_info = get_album_info(url, force_album=force_album)
     album_folder = os.path.join(FOLDER, album_info.folder_name)
     os.makedirs(album_folder, exist_ok=True)
 
@@ -91,8 +116,9 @@ def get_album(url: str, FOLDER: str = ".", EXT: str = "mp3") -> tuple[AlbumInfo,
             "album": track.album,
             "artist": track.artist,
             "date": track.date,
-            "track": str(track.tracknr or i + 1),
         }
+        if album_info.is_album:
+            metadata["track"] = str(track.tracknr or i + 1)
         ydl_opts = build_ydl_opts(ext=EXT, outtmpl=final_path, metadata=metadata)
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:  # type: ignore[reportArgumentType]
@@ -103,5 +129,6 @@ def get_album(url: str, FOLDER: str = ".", EXT: str = "mp3") -> tuple[AlbumInfo,
         print(f"  [{tracknr_str}] {track.title} - {track.artist} [{file_size_mb:.2f} MB]")
         file_paths.append(file_path)
 
-    print(f"\nAlbum downloaded: {album_info.title} ({len(file_paths)} tracks)")
+    label = "Album" if album_info.is_album else "Playlist"
+    print(f"\n{label} downloaded: {album_info.title} ({len(file_paths)} tracks)")
     return album_info, file_paths

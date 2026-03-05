@@ -116,16 +116,22 @@ async def handle_single_url(
 
 
 async def handle_album_url(
-    update: Update, url: str, return_file: bool, folder: str
+    update: Update, url: str, return_file: bool, folder: str, force_album: bool | None = None
 ) -> None:
     assert update.message is not None
     try:
-        info = get_album_info(url)
+        info = get_album_info(url, force_album=force_album)
         action = "📥 Downloading" if return_file else "💾 Saving"
-        await update.message.reply_text(
-            f"{action} album: {info.title} by {info.artist} ({len(info.tracks)} tracks)..."
-        )
-        album_info, file_paths = get_album(url, FOLDER=folder, EXT=get_ext())
+        label = "album" if info.is_album else "playlist"
+        if info.is_album:
+            await update.message.reply_text(
+                f"{action} {label}: {info.title} by {info.artist} ({len(info.tracks)} tracks)..."
+            )
+        else:
+            await update.message.reply_text(
+                f"{action} {label}: {info.title} ({len(info.tracks)} tracks)..."
+            )
+        album_info, file_paths = get_album(url, FOLDER=folder, EXT=get_ext(), force_album=force_album)
         if return_file:
             for fp in file_paths:
                 with open(fp, "rb") as audio:
@@ -133,20 +139,28 @@ async def handle_album_url(
             album_folder = os.path.dirname(file_paths[0])
             shutil.rmtree(album_folder)
             await update.message.reply_text(
-                f"✅ Sent album: {album_info.title} ({len(file_paths)} tracks)"
+                f"✅ Sent {label}: {album_info.title} ({len(file_paths)} tracks)"
             )
         else:
             total_size = sum(
                 os.path.getsize(fp) / (1024 * 1024) for fp in file_paths
             )
-            message = (
-                f"✅ Album saved to server:\n\n"
-                f"💿 Album: {album_info.title}\n"
-                f"🎤 Artist: {album_info.artist}\n"
-                f"📅 Date: {format_date(album_info.date)}\n"
-                f"🎵 Tracks: {len(file_paths)}\n"
-                f"💾 Total size: {total_size:.2f} MB"
-            )
+            if album_info.is_album:
+                message = (
+                    f"✅ Album saved to server:\n\n"
+                    f"💿 Album: {album_info.title}\n"
+                    f"🎤 Artist: {album_info.artist}\n"
+                    f"📅 Date: {format_date(album_info.date)}\n"
+                    f"🎵 Tracks: {len(file_paths)}\n"
+                    f"💾 Total size: {total_size:.2f} MB"
+                )
+            else:
+                message = (
+                    f"✅ Playlist saved to server:\n\n"
+                    f"📋 Playlist: {album_info.title}\n"
+                    f"🎵 Tracks: {len(file_paths)}\n"
+                    f"💾 Total size: {total_size:.2f} MB"
+                )
             await update.message.reply_text(message)
     except Exception as e:
         traceback.print_exc()
@@ -167,9 +181,15 @@ async def handle_url(
     message_text = update.message.text or ""
     folder = get_folder(return_file)
 
+    force_album: bool | None = None
+    if "--album" in message_text:
+        force_album = True
+    elif "--playlist" in message_text:
+        force_album = False
+
     playlist_match = re.search(PLAYLIST_REGEX, message_text)
     if playlist_match:
-        await handle_album_url(update, playlist_match.group(0), return_file, folder)
+        await handle_album_url(update, playlist_match.group(0), return_file, folder, force_album=force_album)
         return
 
     single_match = re.search(SINGLE_REGEX, message_text)
