@@ -26,11 +26,19 @@ def get_single_info(url: str) -> SingleInfo:
         )
     with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
         info = ydl.extract_info(url, download=False)
-        # print(info)
-        title = info.get("title", "output").strip()
+        metadata_keys = [
+            "title", "track", "artist", "artists", "creator", "uploader",
+            "album", "album_artist", "thumbnail", "release_date", "upload_date",
+            "release_year", "description", "genre", "track_number",
+        ]
+        print("--- yt-dlp raw metadata ---")
+        for k in metadata_keys:
+            print(f"  {k}: {info.get(k)!r}")
+        print("---")
+        title = info.get("track") or info.get("title", "output").strip()
         artist = info.get("artist") or info.get("uploader", "Unknown")
         thumbnail = info.get("thumbnail", "No thumbnail")
-        upload_date = info.get("release_date", info.get("upload_date", ""))
+        upload_date = info.get("release_date") or info.get("upload_date", "")
     # Rimuovi tutto dentro (), [] e anche "(Visual)"
     title = re.sub(r'\s*[\(\[].*?[\)\]]\s*', '', title).strip()
     # Converti virgole in punto e virgola per gli artisti
@@ -41,7 +49,7 @@ def get_single_info(url: str) -> SingleInfo:
     #   user_input = input(f"Title: {title}\nAccept? [enter] or new title: ").strip()
     # title = title if user_input == "" else user_input
     title = title.strip()
-    album = title
+    album = info.get("album") or title
     safe_filename = sanitize_filename(title)
     return SingleInfo(
         title=title,

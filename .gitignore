@@ -4,3 +4,4 @@ __pycache__
 potoken
 .env
 *.mp3
+CLAUDE.md
