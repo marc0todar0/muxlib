@@ -1,7 +1,7 @@
 services:
   muxlib:
     build: .
-    user: "1234:1365"  # Output of `id -u` and `id -g`
+    user: "1000:1000" # Output of `id -u` and `id -g`  "1234:1365"
     container_name: muxlib
     restart: unless-stopped
     env_file:
