@@ -1,5 +1,8 @@
-# Bot - yt-dlp downloader wrapper
-NB: Its important to keep yt-dlp always updated!
+# muxlib
+
+A personal music library manager. Downloads YouTube audio as MP3, manages metadata, and (soon) tracks your library in a database.
+
+NB: yt-dlp must be kept updated — YouTube changes frequently.
 
 ## Available Commands
 
@@ -60,12 +63,20 @@ cp pre-commit .git/hooks/pre-commit
 
 This installs dev tools (ruff, pyright, pytest) and enables the pre-commit hook that runs linting before each commit.
 
+## RUN
+
+```bash
+```
+python -m muxlib
+```
+```
+
 ## Testing
 
 Requires `ffmpeg` installed and network access (tests hit real YouTube).
 
 ```bash
-python -m pytest -v
+python -m pytest -v -s
 ```
 
 ### Notes
@@ -74,3 +85,26 @@ python -m pytest -v
 ### Dependencies:
 - https://github.com/yt-dlp/yt-dlp
 - https://python-telegram-bot.org/
+
+---
+
+## Roadmap
+
+### Done
+- [x] Single track download (YouTube / YouTube Music)
+- [x] Album / playlist download with auto-detection
+- [x] ID3 metadata tagging (title, artist, album, cover art, track number)
+- [x] Telegram bot with `/download`, `/save`, `/myid` commands
+- [x] CLI tool for local downloads
+- [x] `--album` / `--playlist` override flags
+- [x] Docker deployment
+
+### Next
+- [ ] **Library database** — SQLite/Postgres DB that syncs with the download folder, tracking every song and album
+- [ ] **Metadata management** — View and edit ID3 tags from Telegram or CLI
+- [ ] **Duplicate detection** — Detect and handle duplicate tracks across albums/playlists
+- [ ] **Delete songs/albums** — Remove tracks from folder + DB via bot command or CLI
+- [ ] **Library search** — Search your library by title, artist, album from Telegram
+- [ ] **Sync engine** — Watch folder for external changes and keep DB in sync
+- [ ] **Stats & history** — Download history, library size, most downloaded artists
+

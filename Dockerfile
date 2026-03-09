@@ -27,4 +27,4 @@ COPY . .
 RUN mkdir -p /app/downloads /app/tmp && chmod 777 /app/tmp
 
 # Run the bot
-CMD ["python", "-m", "bot"]
+CMD ["python", "-m", "muxlib"]

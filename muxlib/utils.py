@@ -1,0 +1,58 @@
+import re
+from datetime import datetime
+from typing import Any
+
+
+def clean_title(title: str) -> str:
+    return re.sub(r"\s*[\(\[].*?[\)\]]\s*", "", title).strip()
+
+
+def split_artist_title(title: str) -> tuple[str, str] | None:
+    """Split 'Artist - Title' format common in YouTube video titles.
+    Returns (artist, title) or None if no separator found."""
+    if " - " in title:
+        artist, _, track = title.partition(" - ")
+        artist = artist.strip()
+        track = track.strip()
+        if artist and track:
+            return artist, track
+    return None
+
+
+def clean_artist(artist: str) -> str:
+    if "," in artist:
+        return artist.replace(",", ";")
+    return artist
+
+
+def build_ydl_opts(ext: str, outtmpl: str, metadata: dict[str, str]) -> dict[str, Any]:
+    return {
+        "format": "bestaudio/best",
+        "writethumbnail": True,
+        "quiet": False,
+        "no_warnings": True,
+        "postprocessors": [
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": ext,
+                "preferredquality": "192",
+            },
+            {"key": "EmbedThumbnail"},
+            {
+                "key": "FFmpegMetadata",
+                "add_metadata": True,
+            },
+        ],
+        "postprocessor_args": [
+            arg
+            for key, val in metadata.items()
+            for arg in ("-metadata", f"{key}={val}")
+        ],
+        "outtmpl": outtmpl,
+    }
+
+
+def format_date(date: str) -> str:
+    if not date:
+        return ""
+    return datetime.strptime(date, "%Y%m%d").strftime("%d/%m/%Y")

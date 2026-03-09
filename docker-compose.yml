@@ -1,8 +1,8 @@
 services:
-  yt-dlp-bot:
+  muxlib:
     build: .
     user: "1234:1365"  # Output of `id -u` and `id -g`
-    container_name: yt-dlp-telegram-bot
+    container_name: muxlib
     restart: unless-stopped
     env_file:
       - .env

@@ -1,8 +1,7 @@
 """Integration test using a real NCS track from YouTube Music."""
 import os
 
-from single import get_single_info, get_single
-from album import get_album_info, get_album
+from muxlib.downloader import get_single_info, get_single, get_album_info, get_album
 
 NCS_URL = "https://music.youtube.com/watch?v=rgxfky2vqw4"
 

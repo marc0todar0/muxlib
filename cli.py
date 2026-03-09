@@ -3,8 +3,7 @@ import argparse
 import os
 import subprocess
 from dotenv import load_dotenv
-from single import get_single, get_single_info
-from album import get_album, get_album_info
+from muxlib.downloader import get_single, get_single_info, get_album, get_album_info
 
 load_dotenv()
 

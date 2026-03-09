@@ -1,24 +1,67 @@
 import os
 import re
-from dataclasses import dataclass, field
 from typing import Any
 
 import yt_dlp
 from pathvalidate import sanitize_filename
 
-from single import SingleInfo, clean_title, clean_artist, build_ydl_opts
+from muxlib.models import AlbumInfo, SingleInfo
+from muxlib.utils import build_ydl_opts, clean_artist, clean_title, split_artist_title
 
 
-@dataclass
-class AlbumInfo:
-    title: str
-    artist: str
-    date: str
-    thumbnail: str
-    folder_name: str
-    is_album: bool = True
-    tracks: list[SingleInfo] = field(default_factory=list)
-    track_urls: list[str] = field(default_factory=list)
+# --- Single ---
+
+
+def get_single_info(url: str) -> SingleInfo:
+    if "playlist" in url:
+        raise ValueError(
+            "get_single_info cannot handle a playlist URL. Use get_album_info instead."
+        )
+    with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
+        info: dict[str, Any] = ydl.extract_info(url, download=False) or {}  # type: ignore[reportAssignmentType]
+
+    raw_title = clean_title(info.get("track") or info.get("title") or "output")
+    artist = info.get("artist") or ""
+
+    # When track metadata is missing, try splitting "Artist - Title" from the video title
+    if not info.get("track") and not artist:
+        split = split_artist_title(raw_title)
+        if split:
+            artist, raw_title = split
+
+    artist = clean_artist(artist or info.get("uploader") or "Unknown")
+    title = raw_title
+    thumbnail: str = info.get("thumbnail") or ""
+    date: str = info.get("release_date") or info.get("upload_date") or ""
+    album: str = info.get("album") or title
+
+    return SingleInfo(
+        title=title,
+        artist=artist,
+        thumbnail=thumbnail,
+        date=date,
+        album=album,
+        filename=sanitize_filename(title),
+        tracknr=None,
+    )
+
+
+def get_single(url: str, FOLDER: str = ".", EXT: str = "mp3") -> str:
+    i = get_single_info(url=url)
+    final_path = os.path.join(FOLDER, i.filename)
+    metadata = {"title": i.title, "album": i.album, "artist": i.artist, "date": i.date}
+    ydl_opts = build_ydl_opts(ext=EXT, outtmpl=final_path, metadata=metadata)
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:  # type: ignore[reportArgumentType]
+        ydl.download([url])
+
+    file_path = f"{final_path}.{EXT}"
+    file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+    print(f"Saved: {file_path} [{file_size_mb:.2f} MB] - {i.title} by {i.artist}")
+    return file_path
+
+
+# --- Album / Playlist ---
 
 
 def detect_is_album(info: dict[str, Any]) -> bool:
@@ -61,8 +104,16 @@ def get_album_info(url: str, force_album: bool | None = None) -> AlbumInfo:
     tracks: list[SingleInfo] = []
     track_urls: list[str] = []
     for entry in entries:
-        title = clean_title(entry.get("track") or entry.get("title") or "Unknown")
-        artist = clean_artist(entry.get("artist") or entry.get("uploader") or album_artist)
+        raw_title = clean_title(entry.get("track") or entry.get("title") or "Unknown")
+        entry_artist = entry.get("artist") or ""
+
+        if not entry.get("track") and not entry_artist:
+            split = split_artist_title(raw_title)
+            if split:
+                entry_artist, raw_title = split
+
+        title = raw_title
+        artist = clean_artist(entry_artist or entry.get("uploader") or album_artist)
         thumbnail = entry.get("thumbnail") or album_thumbnail
         date = entry.get("release_date") or entry.get("upload_date") or ""
         tracknr = entry.get("playlist_index") if is_album else None

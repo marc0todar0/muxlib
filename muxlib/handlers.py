@@ -2,9 +2,7 @@ import os
 import re
 import shutil
 import traceback
-from datetime import datetime
 
-from dotenv import load_dotenv
 from telegram import Update, BotCommand
 from telegram.ext import (
     Application,
@@ -15,49 +13,17 @@ from telegram.ext import (
     ContextTypes,
 )
 
-from single import get_single, get_single_info
-from album import get_album, get_album_info
-
-load_dotenv()
-
-DISCLAIMER = '[To set metadata automagically paste url of yt "Song" (not "Video")]'
-ALLOWED_USERS: set[str] = (
-    set(os.getenv("USERS_ALLOWED_TO_SAVE", "").split(","))
-    if os.getenv("USERS_ALLOWED_TO_SAVE")
-    else {"*"}
+from muxlib.config import (
+    DISCLAIMER,
+    PLAYLIST_REGEX,
+    SINGLE_REGEX,
+    allowed,
+    authorized,
+    get_ext,
+    get_folder,
 )
-BOT_USERS: set[str] = (
-    set(os.getenv("USERS_ALLOWED", "").split(","))
-    if os.getenv("USERS_ALLOWED")
-    else {"*"}
-)
-
-PLAYLIST_REGEX = r"https?://(www\.)?(youtube\.com|music\.youtube\.com)/playlist\?list=[a-zA-Z0-9_-]+"
-SINGLE_REGEX = r"https?://(www\.)?(youtube\.com/watch\?v=|music\.youtube\.com/watch\?v=|youtu\.be/)[a-zA-Z0-9_-]+"
-
-
-def allowed(user_id: int) -> bool:
-    return "*" in BOT_USERS or str(user_id) in BOT_USERS
-
-
-def authorized(user_id: int) -> bool:
-    return "*" in ALLOWED_USERS or str(user_id) in ALLOWED_USERS
-
-
-def format_date(date: str) -> str:
-    if not date:
-        return ""
-    return datetime.strptime(date, "%Y%m%d").strftime("%d/%m/%Y")
-
-
-def get_folder(return_file: bool) -> str:
-    if return_file:
-        return os.getenv("TMP_FOLDER", "./tmp/")
-    return os.getenv("SAVE_FOLDER", "./downloads/")
-
-
-def get_ext() -> str:
-    return os.getenv("EXT", "mp3")
+from muxlib.downloader import get_album, get_album_info, get_single, get_single_info
+from muxlib.utils import format_date
 
 
 async def myid(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -236,13 +202,14 @@ async def post_init(application: Application) -> None:  # type: ignore[type-arg]
     )
 
 
-token = os.getenv("TGTOKEN")
-assert token is not None, "TGTOKEN environment variable is required"
-app = ApplicationBuilder().token(token).post_init(post_init).build()
+def create_app() -> Application:  # type: ignore[type-arg]
+    token = os.getenv("TGTOKEN")
+    assert token is not None, "TGTOKEN environment variable is required"
+    app = ApplicationBuilder().token(token).post_init(post_init).build()
 
-app.add_handler(CommandHandler("download", download_command))
-app.add_handler(CommandHandler("save", save_command))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_url))
-app.add_handler(CommandHandler("myid", myid))
-print("Bot Starting...")
-app.run_polling()
+    app.add_handler(CommandHandler("download", download_command))
+    app.add_handler(CommandHandler("save", save_command))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_url))
+    app.add_handler(CommandHandler("myid", myid))
+
+    return app
