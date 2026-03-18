@@ -166,6 +166,7 @@ def get_album(url: str, FOLDER: str = ".", EXT: str = "mp3", force_album: bool |
             "title": track.title,
             "album": track.album,
             "artist": track.artist,
+            "album_artist": album_info.artist,
             "date": track.date,
         }
         if album_info.is_album:
