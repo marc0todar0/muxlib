@@ -20,9 +20,15 @@ def split_artist_title(title: str) -> tuple[str, str] | None:
 
 
 def clean_artist(artist: str) -> str:
-    if "," in artist:
-        return artist.replace(",", ";")
-    return artist
+    parts = [p.strip() for p in re.split(r"[,;]", artist) if p.strip()]
+    seen: set[str] = set()
+    unique: list[str] = []
+    for p in parts:
+        key = p.lower()
+        if key not in seen:
+            seen.add(key)
+            unique.append(p)
+    return "; ".join(unique) if unique else artist
 
 
 def build_ydl_opts(ext: str, outtmpl: str, metadata: dict[str, str]) -> dict[str, Any]:

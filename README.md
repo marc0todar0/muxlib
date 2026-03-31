@@ -4,7 +4,7 @@ A personal music library manager. Downloads YouTube audio as MP3, manages metada
 
 NB: yt-dlp must be kept updated — YouTube changes frequently.
 
-## Available Commands
+## Available Commands - Telegram Bot
 
 | Command | Description | Example |
 |---------|-------------|---------|
@@ -57,7 +57,10 @@ docker compose up --build -d
 ## Development Setup
 
 ```bash
-pip install -r requirements-dev.txt
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pip install -U -r requirements-dev.txt
 cp pre-commit .git/hooks/pre-commit
 ```
 
