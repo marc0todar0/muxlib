@@ -6,8 +6,9 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any
 
-from mutagen.id3 import APIC, ID3, error as ID3Error
+from mutagen.id3 import APIC, ID3, error as ID3Error  # type: ignore[attr-defined]
 
 
 def get_image_dimensions(data: bytes) -> tuple[int, int] | None:
@@ -67,7 +68,7 @@ def fix_mp3(path: Path, dry_run: bool) -> str:
     if not apic_keys:
         return "skip (no cover)"
 
-    apic: APIC = tags[apic_keys[0]]
+    apic: Any = tags[apic_keys[0]]
     dims = get_image_dimensions(apic.data)
     if dims is None:
         return "skip (unreadable image)"

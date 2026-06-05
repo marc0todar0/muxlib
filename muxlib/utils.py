@@ -52,7 +52,7 @@ def build_ydl_opts(ext: str, outtmpl: str, metadata: dict[str, str]) -> dict[str
         ],
         "postprocessor_args": {
             "thumbnailsconvertor+ffmpeg_o": ["-vf", "crop=ih:ih"],
-            "ffmpegmetadata": [
+            "metadata+ffmpeg_o": [
                 arg
                 for key, val in metadata.items()
                 for arg in ("-metadata", f"{key}={val}")
