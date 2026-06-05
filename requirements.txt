@@ -2,3 +2,4 @@ yt-dlp
 pathvalidate
 python-telegram-bot
 python-dotenv
+mutagen

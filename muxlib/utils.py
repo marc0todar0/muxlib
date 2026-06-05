@@ -43,17 +43,21 @@ def build_ydl_opts(ext: str, outtmpl: str, metadata: dict[str, str]) -> dict[str
                 "preferredcodec": ext,
                 "preferredquality": "192",
             },
+            {"key": "FFmpegThumbnailsConvertor", "format": "jpg"},
             {"key": "EmbedThumbnail"},
             {
                 "key": "FFmpegMetadata",
                 "add_metadata": True,
             },
         ],
-        "postprocessor_args": [
-            arg
-            for key, val in metadata.items()
-            for arg in ("-metadata", f"{key}={val}")
-        ],
+        "postprocessor_args": {
+            "thumbnailsconvertor+ffmpeg_o": ["-vf", "crop=ih:ih"],
+            "ffmpegmetadata": [
+                arg
+                for key, val in metadata.items()
+                for arg in ("-metadata", f"{key}={val}")
+            ],
+        },
         "outtmpl": outtmpl,
     }
 
