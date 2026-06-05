@@ -33,7 +33,7 @@ def get_single_info(url: str) -> SingleInfo:
     title = raw_title
     thumbnail: str = info.get("thumbnail") or ""
     date: str = info.get("release_date") or info.get("upload_date") or ""
-    album: str = info.get("album") or title
+    album: str = clean_title(info.get("album") or "") or title
 
     return SingleInfo(
         title=title,
@@ -121,7 +121,7 @@ def get_album_info(url: str, force_album: bool | None = None) -> AlbumInfo:
         if is_album:
             album = album_title
         else:
-            album = entry.get("album") or clean_title(entry.get("track") or entry.get("title") or "Unknown")
+            album = clean_title(entry.get("album") or entry.get("track") or entry.get("title") or "Unknown")
 
         if not album_date and date:
             album_date = date
