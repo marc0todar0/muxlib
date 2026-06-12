@@ -2,6 +2,8 @@ import re
 from datetime import datetime
 from typing import Any
 
+from mutagen import File as MutagenFile  # type: ignore[attr-defined]
+
 
 def clean_title(title: str) -> str:
     return re.sub(r"\s*[\(\[].*?[\)\]]\s*", "", title).strip()
@@ -66,3 +68,20 @@ def format_date(date: str) -> str:
     if not date:
         return ""
     return datetime.strptime(date, "%Y%m%d").strftime("%d/%m/%Y")
+
+
+def artists_overlap(a: str, b: str) -> bool:
+    set_a = {p.strip().lower() for p in re.split(r"[,;]", a) if p.strip()}
+    set_b = {p.strip().lower() for p in re.split(r"[,;]", b) if p.strip()}
+    return bool(set_a & set_b)
+
+
+def read_artist_tag(file_path: str) -> str:
+    audio = MutagenFile(file_path)
+    if audio is None or not audio.tags:
+        return ""
+    for key in ("TPE1", "artist", "ARTIST", "\xa9ART"):
+        if key in audio.tags:
+            val = audio.tags[key]
+            return "; ".join(str(x) for x in val) if isinstance(val, list) else str(val)
+    return ""

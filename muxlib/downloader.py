@@ -6,7 +6,14 @@ import yt_dlp
 from pathvalidate import sanitize_filename
 
 from muxlib.models import AlbumInfo, SingleInfo
-from muxlib.utils import build_ydl_opts, clean_artist, clean_title, split_artist_title
+from muxlib.utils import (
+    artists_overlap,
+    build_ydl_opts,
+    clean_artist,
+    clean_title,
+    read_artist_tag,
+    split_artist_title,
+)
 
 
 # --- Single ---
@@ -49,6 +56,12 @@ def get_single_info(url: str) -> SingleInfo:
 def get_single(url: str, FOLDER: str = ".", EXT: str = "mp3") -> str:
     i = get_single_info(url=url)
     final_path = os.path.join(FOLDER, i.filename)
+    existing = f"{final_path}.{EXT}"
+    if os.path.exists(existing):
+        if artists_overlap(read_artist_tag(existing), i.artist):
+            os.remove(existing)
+        else:
+            final_path = os.path.join(FOLDER, sanitize_filename(f"{i.title} - {i.artist}"))
     metadata = {"title": i.title, "album": i.album, "artist": i.artist, "date": i.date}
     ydl_opts = build_ydl_opts(ext=EXT, outtmpl=final_path, metadata=metadata)
 
