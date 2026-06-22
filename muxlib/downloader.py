@@ -13,6 +13,7 @@ from muxlib.utils import (
     clean_title,
     read_artist_tag,
     split_artist_title,
+    strip_track_number,
 )
 
 
@@ -69,6 +70,7 @@ def get_single(url: str, FOLDER: str = ".", EXT: str = "mp3") -> str:
         ydl.download([url])
 
     file_path = f"{final_path}.{EXT}"
+    strip_track_number(file_path)
     file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
     print(f"Saved: {file_path} [{file_size_mb:.2f} MB] - {i.title} by {i.artist}")
     return file_path
