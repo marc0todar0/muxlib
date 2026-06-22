@@ -62,7 +62,7 @@ def get_single(url: str, FOLDER: str = ".", EXT: str = "mp3") -> str:
             os.remove(existing)
         else:
             final_path = os.path.join(FOLDER, sanitize_filename(f"{i.title} - {i.artist}"))
-    metadata = {"title": i.title, "album": i.album, "artist": i.artist, "date": i.date, "track": ""}
+    metadata = {"title": i.title, "album": i.album, "artist": i.artist, "date": i.date}
     ydl_opts = build_ydl_opts(ext=EXT, outtmpl=final_path, metadata=metadata)
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:  # type: ignore[reportArgumentType]
