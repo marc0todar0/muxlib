@@ -76,24 +76,6 @@ def artists_overlap(a: str, b: str) -> bool:
     return bool(set_a & set_b)
 
 
-def strip_track_number(file_path: str) -> None:
-    """Remove any track-number tag for singles.
-
-    yt-dlp's FFmpegMetadata postprocessor copies the source's track number
-    (e.g. a stray '63' from YouTube's auto-generated metadata). Clearing it via
-    an empty ``-metadata track=`` is unreliable across ffmpeg/yt-dlp versions,
-    so we strip it directly after download. Format-agnostic via mutagen's easy
-    interface (``tracknumber`` covers mp3/m4a/flac/ogg)."""
-    try:
-        audio = MutagenFile(file_path, easy=True)
-    except Exception:
-        return
-    if audio is None or not audio.tags or "tracknumber" not in audio.tags:
-        return
-    del audio.tags["tracknumber"]
-    audio.save()
-
-
 def read_artist_tag(file_path: str) -> str:
     audio = MutagenFile(file_path)
     if audio is None or not audio.tags:
