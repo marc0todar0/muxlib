@@ -69,9 +69,7 @@ This installs dev tools (ruff, pyright, pytest) and enables the pre-commit hook 
 ## RUN
 
 ```bash
-```
 python -m muxlib
-```
 ```
 
 ## Testing
@@ -102,7 +100,7 @@ python -m pytest -v -s
 - [x] `--album` / `--playlist` override flags
 - [x] Docker deployment
 
-### Next
+### Next ???
 - [ ] **Library database** — SQLite/Postgres DB that syncs with the download folder, tracking every song and album
 - [ ] **Metadata management** — View and edit ID3 tags from Telegram or CLI
 - [ ] **Duplicate detection** — Detect and handle duplicate tracks across albums/playlists
