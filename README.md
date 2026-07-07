@@ -53,6 +53,11 @@ You can override detection by adding a flag to the message:
 ```bash
 docker compose up --build -d
 ```
+## Docker Deploy (YT-DLP UPGRADE)
+
+```bash
+docker compose build --no-cache && docker compose up -d
+```
 
 ## Development Setup
 
