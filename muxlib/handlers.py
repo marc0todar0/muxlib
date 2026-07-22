@@ -98,6 +98,17 @@ async def handle_album_url(
                 f"{action} {label}: {info.title} ({len(info.tracks)} tracks)..."
             )
         album_info, file_paths = get_album(url, FOLDER=folder, EXT=get_ext(), force_album=force_album)
+        if not file_paths:
+            await update.message.reply_text(
+                f"❌ No tracks could be downloaded from {label}: {album_info.title} "
+                f"(all {len(album_info.tracks)} unavailable)."
+            )
+            return
+        skipped = len(album_info.tracks) - len(file_paths)
+        if skipped:
+            await update.message.reply_text(
+                f"⚠️ {skipped} of {len(album_info.tracks)} tracks were unavailable and skipped."
+            )
         if return_file:
             for fp in file_paths:
                 with open(fp, "rb") as audio:

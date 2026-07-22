@@ -3,6 +3,7 @@ import re
 from typing import Any
 
 import yt_dlp
+from yt_dlp.utils import DownloadError
 from pathvalidate import sanitize_filename
 
 from muxlib.models import AlbumInfo, SingleInfo
@@ -14,6 +15,9 @@ from muxlib.utils import (
     read_artist_tag,
     split_artist_title,
 )
+
+
+MAX_RETRIES = 3
 
 
 # --- Single ---
@@ -170,6 +174,7 @@ def get_album(url: str, FOLDER: str = ".", EXT: str = "mp3", force_album: bool |
     os.makedirs(album_folder, exist_ok=True)
 
     file_paths: list[str] = []
+    skipped: list[str] = []
     for i, track in enumerate(album_info.tracks):
         track_url = album_info.track_urls[i]
         tracknr_str = f"{track.tracknr:02d}" if track.tracknr else f"{i + 1:02d}"
@@ -186,8 +191,21 @@ def get_album(url: str, FOLDER: str = ".", EXT: str = "mp3", force_album: bool |
             metadata["track"] = str(track.tracknr or i + 1)
         ydl_opts = build_ydl_opts(ext=EXT, outtmpl=final_path, metadata=metadata)
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:  # type: ignore[reportArgumentType]
-            ydl.download([track_url])
+        last_error: Exception | None = None
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:  # type: ignore[reportArgumentType]
+                    ydl.download([track_url])
+                last_error = None
+                break
+            except DownloadError as e:
+                last_error = e
+                if attempt < MAX_RETRIES:
+                    print(f"  [{tracknr_str}] {track.title} - attempt {attempt}/{MAX_RETRIES} failed, retrying ({e})")
+        if last_error is not None:
+            skipped.append(f"[{tracknr_str}] {track.title}")
+            print(f"  [{tracknr_str}] {track.title} - SKIPPED after {MAX_RETRIES} attempts ({last_error})")
+            continue
 
         file_path = f"{final_path}.{EXT}"
         file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
@@ -196,4 +214,6 @@ def get_album(url: str, FOLDER: str = ".", EXT: str = "mp3", force_album: bool |
 
     label = "Album" if album_info.is_album else "Playlist"
     print(f"\n{label} downloaded: {album_info.title} ({len(file_paths)} tracks)")
+    if skipped:
+        print(f"Skipped {len(skipped)} unavailable track(s): {', '.join(skipped)}")
     return album_info, file_paths
