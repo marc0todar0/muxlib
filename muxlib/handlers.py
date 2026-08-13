@@ -89,25 +89,27 @@ async def handle_album_url(
         info = get_album_info(url, force_album=force_album)
         action = "📥 Downloading" if return_file else "💾 Saving"
         label = "album" if info.is_album else "playlist"
+        total = len(info.tracks) + info.unavailable
         if info.is_album:
             await update.message.reply_text(
-                f"{action} {label}: {info.title} by {info.artist} ({len(info.tracks)} tracks)..."
+                f"{action} {label}: {info.title} by {info.artist} ({total} tracks)..."
             )
         else:
             await update.message.reply_text(
-                f"{action} {label}: {info.title} ({len(info.tracks)} tracks)..."
+                f"{action} {label}: {info.title} ({total} tracks)..."
             )
         album_info, file_paths = get_album(url, FOLDER=folder, EXT=get_ext(), force_album=force_album)
+        total = len(album_info.tracks) + album_info.unavailable
         if not file_paths:
             await update.message.reply_text(
                 f"❌ No tracks could be downloaded from {label}: {album_info.title} "
-                f"(all {len(album_info.tracks)} unavailable)."
+                f"(all {total} unavailable)."
             )
             return
-        skipped = len(album_info.tracks) - len(file_paths)
+        skipped = total - len(file_paths)
         if skipped:
             await update.message.reply_text(
-                f"⚠️ {skipped} of {len(album_info.tracks)} tracks were unavailable and skipped."
+                f"⚠️ {skipped} of {total} tracks were unavailable and skipped."
             )
         if return_file:
             for fp in file_paths:

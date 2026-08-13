@@ -100,8 +100,14 @@ def get_album_info(url: str, force_album: bool | None = None) -> AlbumInfo:
     if "playlist" not in url:
         raise ValueError("get_album_info requires a playlist/album URL.")
 
-    with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
+    # ignoreerrors keeps one unavailable track (age-gated, removed, geo-blocked) from
+    # aborting the whole playlist: yt-dlp yields None for it and we drop it below.
+    with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "ignoreerrors": True}) as ydl:
         info: dict[str, Any] = ydl.extract_info(url, download=False) or {}  # type: ignore[reportAssignmentType]
+
+    raw_entries = list(info.get("entries") or [])
+    info["entries"] = [e for e in raw_entries if e]
+    unavailable = len(raw_entries) - len(info["entries"])
 
     is_album = force_album if force_album is not None else detect_is_album(info)
 
@@ -165,6 +171,7 @@ def get_album_info(url: str, force_album: bool | None = None) -> AlbumInfo:
         is_album=is_album,
         tracks=tracks,
         track_urls=track_urls,
+        unavailable=unavailable,
     )
 
 
@@ -216,4 +223,6 @@ def get_album(url: str, FOLDER: str = ".", EXT: str = "mp3", force_album: bool |
     print(f"\n{label} downloaded: {album_info.title} ({len(file_paths)} tracks)")
     if skipped:
         print(f"Skipped {len(skipped)} unavailable track(s): {', '.join(skipped)}")
+    if album_info.unavailable:
+        print(f"Skipped {album_info.unavailable} track(s) that could not be read at all")
     return album_info, file_paths

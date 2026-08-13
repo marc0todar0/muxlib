@@ -22,3 +22,4 @@ class AlbumInfo:
     is_album: bool = True
     tracks: list[SingleInfo] = field(default_factory=list)
     track_urls: list[str] = field(default_factory=list)
+    unavailable: int = 0
