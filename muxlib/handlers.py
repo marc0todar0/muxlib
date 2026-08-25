@@ -23,6 +23,7 @@ from muxlib.config import (
     get_folder,
 )
 from muxlib.downloader import get_album, get_album_info, get_single, get_single_info
+from muxlib.models import TrackUnavailableError
 from muxlib.utils import format_date
 
 
@@ -76,6 +77,8 @@ async def handle_single_url(
                 f"🖼️ Cover: {'✅ Embedded' if info.thumbnail else '❌ None'}"
             )
             await update.message.reply_text(message)
+    except TrackUnavailableError as e:
+        await update.message.reply_text(f"⚠️ {e}")
     except Exception as e:
         traceback.print_exc()
         await update.message.reply_text(f"❌ Errore: {str(e)}")
@@ -108,9 +111,13 @@ async def handle_album_url(
             return
         skipped = total - len(file_paths)
         if skipped:
-            await update.message.reply_text(
-                f"⚠️ {skipped} of {total} tracks were unavailable and skipped."
-            )
+            lines = [f"⚠️ {skipped} of {total} tracks were unavailable and skipped."]
+            lines += [f"• {entry}" for entry in album_info.skipped]
+            if album_info.unavailable:
+                lines.append(
+                    f"• {album_info.unavailable} track(s) could not be read at all."
+                )
+            await update.message.reply_text("\n".join(lines))
         if return_file:
             for fp in file_paths:
                 with open(fp, "rb") as audio:
@@ -141,6 +148,8 @@ async def handle_album_url(
                     f"💾 Total size: {total_size:.2f} MB"
                 )
             await update.message.reply_text(message)
+    except TrackUnavailableError as e:
+        await update.message.reply_text(f"⚠️ {e}")
     except Exception as e:
         traceback.print_exc()
         await update.message.reply_text(f"❌ Errore: {str(e)}")

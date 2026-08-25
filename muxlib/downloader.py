@@ -1,23 +1,81 @@
 import os
 import re
+import time
+from collections.abc import Callable
 from typing import Any
 
 import yt_dlp
 from yt_dlp.utils import DownloadError
 from pathvalidate import sanitize_filename
 
-from muxlib.models import AlbumInfo, SingleInfo
+from muxlib.models import AlbumInfo, SingleInfo, TrackUnavailableError
 from muxlib.utils import (
     artists_overlap,
     build_ydl_opts,
     clean_artist,
     clean_title,
     read_artist_tag,
+    remove_partial_files,
     split_artist_title,
 )
 
 
-MAX_RETRIES = 3
+MAX_RETRIES = 5
+BACKOFF_BASE_SECONDS = 2
+
+# YouTube hands out 403s on the format URL under load; the same track usually
+# downloads fine a few seconds later. These errors, on the other hand, are the
+# server's final answer — retrying them only delays the skip.
+PERMANENT_ERROR_PATTERNS = (
+    "sign in to confirm your age",
+    "video unavailable",
+    "private video",
+    "removed by the uploader",
+    "members-only",
+)
+
+
+def is_retryable(error: Exception) -> bool:
+    message = str(error).lower()
+    return not any(pattern in message for pattern in PERMANENT_ERROR_PATTERNS)
+
+
+def describe_unavailable(error: Exception) -> str:
+    message = str(error).lower()
+    if "sign in to confirm your age" in message:
+        return "Age-restricted track: YouTube will not serve it without a signed-in session."
+    if "private video" in message:
+        return "This video is private."
+    if "removed by the uploader" in message or "video unavailable" in message:
+        return "This video is no longer available."
+    return "This track could not be downloaded from YouTube."
+
+
+def with_retry[T](action: Callable[[], T], label: str) -> tuple[T | None, Exception | None, int]:
+    """Run a yt-dlp call, retrying transient failures with exponential backoff.
+
+    Returns (result, error, attempts). On success error is None; on failure
+    result is None and error is the DownloadError that ended the last attempt.
+    Permanent errors (see PERMANENT_ERROR_PATTERNS) return after one attempt.
+    """
+    last_error: Exception | None = None
+    attempt = 0
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            return action(), None, attempt
+        except DownloadError as e:
+            last_error = e
+            if not is_retryable(e):
+                print(f"{label} - not retryable ({e})")
+                break
+            if attempt < MAX_RETRIES:
+                delay = BACKOFF_BASE_SECONDS * 2 ** (attempt - 1)
+                print(
+                    f"{label} - attempt {attempt}/{MAX_RETRIES} "
+                    f"failed, retrying in {delay}s ({e})"
+                )
+                time.sleep(delay)
+    return None, last_error, attempt
 
 
 # --- Single ---
@@ -28,8 +86,15 @@ def get_single_info(url: str) -> SingleInfo:
         raise ValueError(
             "get_single_info cannot handle a playlist URL. Use get_album_info instead."
         )
-    with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
-        info: dict[str, Any] = ydl.extract_info(url, download=False) or {}  # type: ignore[reportAssignmentType]
+
+    def extract() -> dict[str, Any]:
+        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
+            return ydl.extract_info(url, download=False) or {}  # type: ignore[reportReturnType]
+
+    info, error, _ = with_retry(extract, label=url)
+    if error is not None:
+        raise TrackUnavailableError(describe_unavailable(error)) from error
+    assert info is not None
 
     raw_title = clean_title(info.get("track") or info.get("title") or "output")
     artist = info.get("artist") or ""
@@ -69,8 +134,14 @@ def get_single(url: str, FOLDER: str = ".", EXT: str = "mp3") -> str:
     metadata = {"title": i.title, "album": i.album, "artist": i.artist, "date": i.date}
     ydl_opts = build_ydl_opts(ext=EXT, outtmpl=final_path, metadata=metadata)
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:  # type: ignore[reportArgumentType]
-        ydl.download([url])
+    def download() -> None:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:  # type: ignore[reportArgumentType]
+            ydl.download([url])
+
+    _, error, _ = with_retry(download, label=i.title)
+    if error is not None:
+        remove_partial_files(final_path)
+        raise TrackUnavailableError(describe_unavailable(error)) from error
 
     file_path = f"{final_path}.{EXT}"
     file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
@@ -102,8 +173,14 @@ def get_album_info(url: str, force_album: bool | None = None) -> AlbumInfo:
 
     # ignoreerrors keeps one unavailable track (age-gated, removed, geo-blocked) from
     # aborting the whole playlist: yt-dlp yields None for it and we drop it below.
-    with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "ignoreerrors": True}) as ydl:
-        info: dict[str, Any] = ydl.extract_info(url, download=False) or {}  # type: ignore[reportAssignmentType]
+    def extract() -> dict[str, Any]:
+        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "ignoreerrors": True}) as ydl:
+            return ydl.extract_info(url, download=False) or {}  # type: ignore[reportReturnType]
+
+    info, error, _ = with_retry(extract, label=url)
+    if error is not None:
+        raise TrackUnavailableError(describe_unavailable(error)) from error
+    assert info is not None
 
     raw_entries = list(info.get("entries") or [])
     info["entries"] = [e for e in raw_entries if e]
@@ -181,7 +258,6 @@ def get_album(url: str, FOLDER: str = ".", EXT: str = "mp3", force_album: bool |
     os.makedirs(album_folder, exist_ok=True)
 
     file_paths: list[str] = []
-    skipped: list[str] = []
     for i, track in enumerate(album_info.tracks):
         track_url = album_info.track_urls[i]
         tracknr_str = f"{track.tracknr:02d}" if track.tracknr else f"{i + 1:02d}"
@@ -198,20 +274,18 @@ def get_album(url: str, FOLDER: str = ".", EXT: str = "mp3", force_album: bool |
             metadata["track"] = str(track.tracknr or i + 1)
         ydl_opts = build_ydl_opts(ext=EXT, outtmpl=final_path, metadata=metadata)
 
-        last_error: Exception | None = None
-        for attempt in range(1, MAX_RETRIES + 1):
-            try:
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:  # type: ignore[reportArgumentType]
-                    ydl.download([track_url])
-                last_error = None
-                break
-            except DownloadError as e:
-                last_error = e
-                if attempt < MAX_RETRIES:
-                    print(f"  [{tracknr_str}] {track.title} - attempt {attempt}/{MAX_RETRIES} failed, retrying ({e})")
-        if last_error is not None:
-            skipped.append(f"[{tracknr_str}] {track.title}")
-            print(f"  [{tracknr_str}] {track.title} - SKIPPED after {MAX_RETRIES} attempts ({last_error})")
+        label = f"  [{tracknr_str}] {track.title}"
+
+        def download() -> None:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:  # type: ignore[reportArgumentType]
+                ydl.download([track_url])
+
+        _, error, attempts = with_retry(download, label=label)
+        if error is not None:
+            remove_partial_files(final_path)
+            reason = describe_unavailable(error)
+            album_info.skipped.append(f"[{tracknr_str}] {track.title} - {reason}")
+            print(f"{label} - SKIPPED after {attempts} attempt(s): {reason}")
             continue
 
         file_path = f"{final_path}.{EXT}"
@@ -221,8 +295,10 @@ def get_album(url: str, FOLDER: str = ".", EXT: str = "mp3", force_album: bool |
 
     label = "Album" if album_info.is_album else "Playlist"
     print(f"\n{label} downloaded: {album_info.title} ({len(file_paths)} tracks)")
-    if skipped:
-        print(f"Skipped {len(skipped)} unavailable track(s): {', '.join(skipped)}")
+    if album_info.skipped:
+        print(f"Skipped {len(album_info.skipped)} unavailable track(s):")
+        for entry in album_info.skipped:
+            print(f"  {entry}")
     if album_info.unavailable:
         print(f"Skipped {album_info.unavailable} track(s) that could not be read at all")
     return album_info, file_paths

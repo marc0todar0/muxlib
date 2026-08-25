@@ -1,3 +1,4 @@
+import os
 import re
 from datetime import datetime
 from typing import Any
@@ -74,6 +75,26 @@ def artists_overlap(a: str, b: str) -> bool:
     set_a = {p.strip().lower() for p in re.split(r"[,;]", a) if p.strip()}
     set_b = {p.strip().lower() for p in re.split(r"[,;]", b) if p.strip()}
     return bool(set_a & set_b)
+
+
+def remove_partial_files(final_path: str) -> None:
+    """Drop the leftovers of a download that never produced an audio file.
+
+    yt-dlp writes the thumbnail before fetching the audio, so a skipped track
+    leaves an orphan .webp (plus any .part) next to the tracks that succeeded.
+    """
+    folder = os.path.dirname(final_path) or "."
+    stem = os.path.basename(final_path)
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return
+    for name in names:
+        if name == stem or name.startswith(f"{stem}."):
+            try:
+                os.remove(os.path.join(folder, name))
+            except OSError:
+                pass
 
 
 def read_artist_tag(file_path: str) -> str:

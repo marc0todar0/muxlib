@@ -3,7 +3,7 @@ import os
 
 from muxlib.downloader import get_single_info, get_single, get_album_info, get_album
 
-NCS_URL = "https://music.youtube.com/watch?v=rgxfky2vqw4"
+NCS_URL = "https://music.youtube.com/watch?v=tEKUj0P5ZZA"
 
 
 class TestGetSingleInfo:
