@@ -34,6 +34,7 @@ You can override detection by adding a flag to the message:
 |------|--------|
 | `--album` | Force album mode (shared album name, track numbers) |
 | `--playlist` | Force playlist mode (each track keeps its own metadata) |
+| `--no-clean` | Keep text in brackets, e.g. `(Album)` or `(Official Video)`, in titles (removed by default) |
 
 **Telegram example:** `--playlist https://music.youtube.com/playlist?list=PLAYLIST_ID`
 

@@ -81,7 +81,7 @@ def with_retry[T](action: Callable[[], T], label: str) -> tuple[T | None, Except
 # --- Single ---
 
 
-def get_single_info(url: str) -> SingleInfo:
+def get_single_info(url: str, clean: bool = True) -> SingleInfo:
     if "playlist" in url:
         raise ValueError(
             "get_single_info cannot handle a playlist URL. Use get_album_info instead."
@@ -96,7 +96,8 @@ def get_single_info(url: str) -> SingleInfo:
         raise TrackUnavailableError(describe_unavailable(error)) from error
     assert info is not None
 
-    raw_title = clean_title(info.get("track") or info.get("title") or "output")
+    tidy = clean_title if clean else str.strip
+    raw_title = tidy(info.get("track") or info.get("title") or "output")
     artist = info.get("artist") or ""
 
     # When track metadata is missing, try splitting "Artist - Title" from the video title
@@ -109,7 +110,7 @@ def get_single_info(url: str) -> SingleInfo:
     title = raw_title
     thumbnail: str = info.get("thumbnail") or ""
     date: str = info.get("release_date") or info.get("upload_date") or ""
-    album: str = clean_title(info.get("album") or "") or title
+    album: str = tidy(info.get("album") or "") or title
 
     return SingleInfo(
         title=title,
@@ -122,8 +123,8 @@ def get_single_info(url: str) -> SingleInfo:
     )
 
 
-def get_single(url: str, FOLDER: str = ".", EXT: str = "mp3") -> str:
-    i = get_single_info(url=url)
+def get_single(url: str, FOLDER: str = ".", EXT: str = "mp3", clean: bool = True) -> str:
+    i = get_single_info(url=url, clean=clean)
     final_path = os.path.join(FOLDER, i.filename)
     existing = f"{final_path}.{EXT}"
     if os.path.exists(existing):
@@ -167,7 +168,7 @@ def detect_is_album(info: dict[str, Any]) -> bool:
     return bool(albums[0] and albums[0].strip())
 
 
-def get_album_info(url: str, force_album: bool | None = None) -> AlbumInfo:
+def get_album_info(url: str, force_album: bool | None = None, clean: bool = True) -> AlbumInfo:
     if "playlist" not in url:
         raise ValueError("get_album_info requires a playlist/album URL.")
 
@@ -188,9 +189,12 @@ def get_album_info(url: str, force_album: bool | None = None) -> AlbumInfo:
 
     is_album = force_album if force_album is not None else detect_is_album(info)
 
+    tidy = clean_title if clean else str.strip
     album_title: str = info.get("title") or "Unknown Album"
     if is_album:
-        album_title = re.sub(r"^album\s*-\s*", "", album_title, flags=re.IGNORECASE).strip()
+        album_title = re.sub(r"^album\s*-\s*", "", album_title, flags=re.IGNORECASE)
+    # A title made only of brackets would clean down to nothing; keep it as-is then.
+    album_title = tidy(album_title) or album_title.strip()
     album_thumbnail: str = info.get("thumbnail") or ""
     album_date: str = ""
 
@@ -204,7 +208,7 @@ def get_album_info(url: str, force_album: bool | None = None) -> AlbumInfo:
     tracks: list[SingleInfo] = []
     track_urls: list[str] = []
     for entry in entries:
-        raw_title = clean_title(entry.get("track") or entry.get("title") or "Unknown")
+        raw_title = tidy(entry.get("track") or entry.get("title") or "Unknown")
         entry_artist = entry.get("artist") or ""
 
         if not entry.get("track") and not entry_artist:
@@ -221,7 +225,7 @@ def get_album_info(url: str, force_album: bool | None = None) -> AlbumInfo:
         if is_album:
             album = album_title
         else:
-            album = clean_title(entry.get("album") or entry.get("track") or entry.get("title") or "Unknown")
+            album = tidy(entry.get("album") or entry.get("track") or entry.get("title") or "Unknown")
 
         if not album_date and date:
             album_date = date
@@ -252,8 +256,10 @@ def get_album_info(url: str, force_album: bool | None = None) -> AlbumInfo:
     )
 
 
-def get_album(url: str, FOLDER: str = ".", EXT: str = "mp3", force_album: bool | None = None) -> tuple[AlbumInfo, list[str]]:
-    album_info = get_album_info(url, force_album=force_album)
+def get_album(
+    url: str, FOLDER: str = ".", EXT: str = "mp3", force_album: bool | None = None, clean: bool = True
+) -> tuple[AlbumInfo, list[str]]:
+    album_info = get_album_info(url, force_album=force_album, clean=clean)
     album_folder = os.path.join(FOLDER, album_info.folder_name)
     os.makedirs(album_folder, exist_ok=True)
 

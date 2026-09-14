@@ -49,16 +49,16 @@ async def myid(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def handle_single_url(
-    update: Update, url: str, return_file: bool, folder: str
+    update: Update, url: str, return_file: bool, folder: str, clean: bool = True
 ) -> None:
     assert update.message is not None
     try:
-        info = get_single_info(url=url)
+        info = get_single_info(url=url, clean=clean)
         action = "📥 Downloading" if return_file else "💾 Saving"
         await update.message.reply_text(
             f"{action} {info.title} by {info.artist}..."
         )
-        file_path = get_single(url, FOLDER=folder, EXT=get_ext())
+        file_path = get_single(url, FOLDER=folder, EXT=get_ext(), clean=clean)
         if return_file:
             with open(file_path, "rb") as audio:
                 await update.message.reply_audio(audio)
@@ -85,11 +85,16 @@ async def handle_single_url(
 
 
 async def handle_album_url(
-    update: Update, url: str, return_file: bool, folder: str, force_album: bool | None = None
+    update: Update,
+    url: str,
+    return_file: bool,
+    folder: str,
+    force_album: bool | None = None,
+    clean: bool = True,
 ) -> None:
     assert update.message is not None
     try:
-        info = get_album_info(url, force_album=force_album)
+        info = get_album_info(url, force_album=force_album, clean=clean)
         action = "📥 Downloading" if return_file else "💾 Saving"
         label = "album" if info.is_album else "playlist"
         total = len(info.tracks) + info.unavailable
@@ -101,7 +106,9 @@ async def handle_album_url(
             await update.message.reply_text(
                 f"{action} {label}: {info.title} ({total} tracks)..."
             )
-        album_info, file_paths = get_album(url, FOLDER=folder, EXT=get_ext(), force_album=force_album)
+        album_info, file_paths = get_album(
+            url, FOLDER=folder, EXT=get_ext(), force_album=force_album, clean=clean
+        )
         total = len(album_info.tracks) + album_info.unavailable
         if not file_paths:
             await update.message.reply_text(
@@ -175,15 +182,18 @@ async def handle_url(
         force_album = True
     elif re.search(r"(?:--|[—–])\s*playlist\b", message_text, re.IGNORECASE):
         force_album = False
+    clean = not re.search(r"(?:--|[—–])\s*no-clean\b", message_text, re.IGNORECASE)
 
     playlist_match = re.search(PLAYLIST_REGEX, message_text)
     if playlist_match:
-        await handle_album_url(update, playlist_match.group(0), return_file, folder, force_album=force_album)
+        await handle_album_url(
+            update, playlist_match.group(0), return_file, folder, force_album=force_album, clean=clean
+        )
         return
 
     single_match = re.search(SINGLE_REGEX, message_text)
     if single_match:
-        await handle_single_url(update, single_match.group(0), return_file, folder)
+        await handle_single_url(update, single_match.group(0), return_file, folder, clean=clean)
         return
 
     await update.message.reply_text(

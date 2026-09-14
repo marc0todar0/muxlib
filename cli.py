@@ -52,9 +52,15 @@ def main():
         action="store_true",
         help="Force playlist mode (override auto-detection)",
     )
+    parser.add_argument(
+        "--no-clean",
+        action="store_true",
+        help="Keep text in brackets in titles (removed by default)",
+    )
     args = parser.parse_args()
 
     is_playlist = "playlist" in args.url
+    clean = not args.no_clean
 
     force_album: bool | None = None
     if args.album:
@@ -64,7 +70,7 @@ def main():
 
     if args.info_only:
         if is_playlist:
-            info = get_album_info(args.url, force_album=force_album)
+            info = get_album_info(args.url, force_album=force_album, clean=clean)
             label = "Album" if info.is_album else "Playlist"
             print(f"{label}:    {info.title}")
             print(f"Artist:    {info.artist}")
@@ -74,7 +80,7 @@ def main():
             for t in info.tracks:
                 print(f"  [{t.tracknr:02d}] {t.title} - {t.artist}" if t.tracknr else f"  [ ] {t.title} - {t.artist}")
         else:
-            info = get_single_info(args.url)
+            info = get_single_info(args.url, clean=clean)
             print(f"Title:     {info.title}")
             print(f"Artist:    {info.artist}")
             print(f"Album:     {info.album}")
@@ -83,7 +89,9 @@ def main():
     else:
         os.makedirs(args.output, exist_ok=True)
         if is_playlist:
-            album_info, paths = get_album(args.url, FOLDER=args.output, EXT=args.ext, force_album=force_album)
+            album_info, paths = get_album(
+                args.url, FOLDER=args.output, EXT=args.ext, force_album=force_album, clean=clean
+            )
             label = "Album" if album_info.is_album else "Playlist"
             print(f"\n{label} saved: {album_info.title} ({len(paths)} tracks)")
             for p in paths:
@@ -91,7 +99,7 @@ def main():
                 if args.tags:
                     show_id3_tags(p)
         else:
-            path = get_single(args.url, FOLDER=args.output, EXT=args.ext)
+            path = get_single(args.url, FOLDER=args.output, EXT=args.ext, clean=clean)
             print(f"\nSaved: {path}")
             if args.tags:
                 print("\n--- ID3 tags ---")
