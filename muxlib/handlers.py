@@ -169,10 +169,11 @@ async def handle_url(
     message_text = update.message.text or ""
     folder = get_folder(return_file)
 
+    # Clients with smart punctuation turn "--" into an em/en dash.
     force_album: bool | None = None
-    if "--album" in message_text:
+    if re.search(r"(?:--|[—–])\s*album\b", message_text, re.IGNORECASE):
         force_album = True
-    elif "--playlist" in message_text:
+    elif re.search(r"(?:--|[—–])\s*playlist\b", message_text, re.IGNORECASE):
         force_album = False
 
     playlist_match = re.search(PLAYLIST_REGEX, message_text)
